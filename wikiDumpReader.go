@@ -69,12 +69,17 @@ type PageProcessor interface {
 	Summary()
 }
 
-func RunProcessor(processor PageProcessor) {
+func RunProcessor(processor PageProcessor, limit int) {
 	if len(os.Args) < 2 {
 		log.Fatal("Please specify a file to read")
 	}
 	processor.Init()
+	processed := 0
 	for page := range Read(os.Args[1]) {
+		if limit >= 0 && processed >= limit {
+			break
+		}
+		processed++
 		processor.Process(page)
 	}
 	processor.Summary()

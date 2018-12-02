@@ -1,3 +1,8 @@
 wikidump
+*.swp
 *.bz2
 *.db
+*.lwp
+user-config.py
+throttle.ctrl
+apicache-py3/

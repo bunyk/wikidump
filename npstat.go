@@ -1,5 +1,7 @@
 package main
 
+/*
+
 import (
 	"database/sql"
 	"encoding/json"
@@ -211,3 +213,4 @@ var npPattern = regexp.MustCompile(
 func pageTemplates(text string) []string {
 	return npPattern.FindAllString(text, -1)
 }
+*/

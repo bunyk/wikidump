@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -40,13 +41,26 @@ func (cc *CharCounter) Summary() {
 		sum += v
 	}
 	sort.Slice(top, func(i, j int) bool {
-		return top[i].Freq < top[j].Freq
+		return top[i].Freq > top[j].Freq
 	})
+	var top255 = [255]rune{}
 	for i, rf := range top {
-		fmt.Println("%d) &#%d;: %d", len(cc.charcount)-i, rf.R, rf.Freq)
+		if i < 255 {
+			top255[i] = rf.R
+			fmt.Printf("%d) &#%d;: %d\n", i, rf.R, rf.Freq)
+		}
 	}
-	fmt.Println("Total characters: %d", sum)
-	fmt.Println("Different characters: %d", len(cc.charcount))
+	encoding, _ := json.Marshal(top255)
+	fmt.Println(string(encoding))
+	file, err := os.Create("freq_chars.json")
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	defer file.Close()
+	_, err = file.Write(encoding)
+
+	fmt.Printf("Total characters: %d\n", sum)
+	fmt.Printf("Different characters: %d\n", len(cc.charcount))
 }
 
 type RuneFreq struct {
