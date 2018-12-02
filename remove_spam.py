@@ -6,8 +6,6 @@ from pywikibot import pagegenerators
 
 def main():
     domains = list(read_domains_list('spamsites.csv'))
-    print("Total:", len(list(pages_linking_to(domains))))
-    return
     for page in pages_linking_to(domains):
         print(page.title())
         new_text = page.text
@@ -37,6 +35,8 @@ def external_links_cleaner(text, domains):
             if line.startswith('* {{cite'):
                 continue
             if line.startswith('* [http'):
+                continue
+            if line.startswith('* http'):
                 continue
         res.append(line)
     return '\n'.join(res)
