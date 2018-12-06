@@ -29,7 +29,7 @@ def ref_cleaner(text, domains):
             wikicode.replace(tag, '{{fact}}')
 
     res = str(wikicode)
-    res = res.replace('{{fact}}<ref', '<ref')
+    res = res.replace('{{fact}}<ref', '<ref') # TODO: replace to regexp and add \s* between template and ref
     res = res.replace('ref>{{fact}}', 'ref>')
     return res
 
