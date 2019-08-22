@@ -26,6 +26,7 @@ SCOPE = [dict(
         'style',
         'стиль',
         'стиль розділу',
+        'переписати розділ',
     ]
 )]
 
@@ -60,6 +61,8 @@ def add_dates(site, category_name, template_names):
                     template.add("дата", get_template_date_for(added))
 
             new_text = str(code)
+        else:
+            print('Чомусь невідомо коли шаблон додали')
         new_text = new_text.replace("[[%s]]" % category_name, '')
         pywikibot.showDiff(page.text, new_text)
         page.text = new_text
@@ -75,6 +78,7 @@ def when_template_was_added(page, template_names):
             return last_time_saw_template
         else:
             last_time_saw_template = revision.timestamp
+    return last_time_saw_template
 
 def match_template(template, template_names):
     tmpl_name = template.name.lower()
