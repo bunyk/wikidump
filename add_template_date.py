@@ -13,6 +13,12 @@ PROBLEM_TEMPLATES = {
 }
 
 SCOPE = {
+    # "Статті, написані занадто складно": dict(
+    #     template_names={
+    #         'незрозуміло',
+    #     },
+    #     problems_parameters={},
+    # ),
     "Статті з сумнівною значимістю": dict(
         template_names = {
             'значимість',
@@ -28,9 +34,10 @@ SCOPE = {
             'без категорій',
             'категорія',
             'recat',
-            'категоризувати'
+            'категоризувати',
+            'категоризація',
         ],
-        # 'problemsParameters': {u'cat', u'без категорій'},
+        problems_parameters={'cat', 'без категорій'},
     ),
     "Статті до об'єднання": dict(
         template_names = [
@@ -73,6 +80,7 @@ SCOPE = {
             'unabbreviate',
             'abbrev',
             'реклама',
+            'essay-like',
         ],
         problems_parameters={'style', 'стиль', 'abbr', 'абр'},
     ),
@@ -132,7 +140,12 @@ SCOPE = {
             'перевірити нейтральність',
             'neutrality',
         ],
-        # 'problemsParameters': {u'npov', u'НТЗ', u'нейтральність сумнівна'},
+        problems_parameters={
+            'нейтральність',
+            'npov',
+            'НТЗ',
+            'нейтральність сумнівна'
+        },
     ),
     'Статті без джерел': dict(
         template_names={
@@ -152,77 +165,122 @@ SCOPE = {
             'refless',
             'source',
         },
-    )
+    ),
     'Статті, що потребують додаткових посилань на джерела': dict(
         template_names={
-            'Refimprovesect',
+            'refimprovesect',
+            'refimprove',
+            'cleanup-verify',
+            'достовірність',
+            'недостовірність',
+            'not verified',
+            'додаткові джерела',
+            'more sources',
+            'першоджерела',
+            'розділ без джерел',
         },
         problems_parameters={
             'refimprove',
+            'недостовірність',
         }
-    )
+    ),
+    'Статті без виносок': dict(
+        template_names={
+            'без виносок',
+            'без посилань',
+        },
+        problems_parameters={
+            'no footnotes',
+            'виноски',
+            'без виносок',
+        },
+    ),
+    'Статті, які можуть містити оригінальне дослідження': dict(
+        template_names={
+            'оригінальне дослідження',
+            'оригінальні дослідження',
+            'інформаційні помилки',
+            'фактичні помилки',
+            'од'
+        },
+        problems_parameters={
+            'OR',
+            'ОД',
+            'оригінальне дослідження',
+        },
+    ),
+    'Статті, що потребують вичитки': dict(
+        template_names={
+            'мовні помилки',
+            'вичитати',
+            'запит на вичитку',
+            'помилки',
+            'copy edit'
+        },
+        problems_parameters={
+            'mistakes',
+            'помилки',
+            'правопіс',
+            'вичитати'
+        },
+    ),
+    'Статті з обмеженим географічним охопленням': dict(
+        template_names={
+            'глобалізувати',
+            'україніка',
+            'ukrainika',
+            'ukraine-specific',
+            'country-specific',
+            'globalize',
+            'internationalize',
+        },
+        problems_parameters={
+            'україніка',
+        },
+    ),
+    'Статті, що можуть бути застарілими': dict(
+        template_names={
+            'оновити',
+            'update',
+            'старі дані',
+            'застарілі дані',
+            'out of date',
+            'outdated',
+            'oldinformation',
+            'уре1'
+        },
+        problems_parameters={
+            'update',
+            'оновити',
+            'старі дані'
+        },
+    ),
+    'Статті з неавторитетними джерелами': dict(
+        template_names={
+            'неавторитетні джерела',
+            'без ад',
+            'над',
+        },
+        problems_parameters={
+        },
+    ),
+    'Статті, які потрібно виправити після перекладу': dict(
+        template_names={
+            'автопереклад',
+            'автопереклад старий',
+            'переклад поганої якості',
+            'поганий переклад',
+            'autotranslation',
+            'auto-translate',
+            'autotranslate',
+        },
+        problems_parameters={
+            'machine-trans',
+            'автопереклад',
+            'переклад',
+        },
+    ),
 }
-
-'''
-    {
-        'templateName': u'Оригінальне дослідження',
-        'templateAliases': {u'Оригінальні дослідження', u'Інформаційні помилки', u'Фактичні помилки', u'ОД'},
-        'problemsParameters': {u'OR', u'ОД'},
-        'categoryName': u'Статті, які можуть містити оригінальне дослідження'
-    },
-    {
-        'templateName': u'Оновити',
-        'templateAliases': {u'Update', u'Старі дані', u'Застарілі дані', u'Out of date', u'Outdated', u'OldInformation',
-                            u'УРЕ1'},
-        'problemsParameters': {u'update', u'оновити', u'старі дані'},
-        'categoryName': u'Статті, що можуть бути застарілими'
-    },
-    {
-        'templateName': u'Refimprove',
-        'templateAliases': {u'Cleanup-verify', u'Достовірність', u'Недостовірність', u'Not verified',
-                            u'Додаткові джерела', u'More sources', u'Першоджерела'},
-        'problemsParameters': {u'недостовірність'},
-        'categoryName': u'Статті, що потребують додаткових посилань на джерела'
-    },
-    {
-        'templateName': u'Розділ без джерел',
-        'templateAliases': set(),
-        'problemsParameters': set(),
-        'categoryName': u'Статті, що потребують додаткових посилань на джерела'
-    },
-    {
-        'templateName': u'Без виносок',
-        'templateAliases': {u'Без посилань'},
-        'problemsParameters': {u'no footnotes', u'виноски', u'без виносок'},
-        'categoryName': u'Статті без виносок'
-    },
-    {
-        'templateName': u'Неавторитетні джерела',
-        'templateAliases': {u'Без АД', u'НАД'},
-        'problemsParameters': set(),
-        'categoryName': u'Статті з неавторитетними джерелами'
-    },
-    {
-        'templateName': u'Глобалізувати',
-        'templateAliases': {u'Україніка', u'Ukrainika', u'Ukraine-specific', u'Country-specific', u'Globalize',
-                            u'Internationalize'},
-        'problemsParameters': {u'україніка'},
-        'categoryName': u'Статті з обмеженим географічним охопленням'
-    },
-    {
-        'templateName': u'Мовні помилки',
-        'templateAliases': {u'Вичитати', u'Запит на вичитку', u'Помилки', u'Copy edit'},
-        'problemsParameters': {u'mistakes', u'помилки', u'правопіс', u'вичитати'},
-        'categoryName': u'Статті, що потребують вичитки'
-    },
-    {
-        'templateName': u'Автопереклад',
-        'templateAliases': {u'Автопереклад старий', u'Переклад поганої якості', u'Поганий переклад', u'Autotranslation',
-                            u'Auto-translate', u'Autotranslate'},
-        'problemsParameters': {u'machine-trans', u'автопереклад', u'переклад'},
-        'categoryName': u'Статті, які потрібно виправити після перекладу'
-    },
-'''
 
 TEMPLATES_2_PROBLEMS = {
     template: problem
@@ -269,10 +327,14 @@ def fix_page(site, page):
             if match_template(template, SCOPE[problem]['template_names']) and not template.has("дата"):
                 template.add("дата", formatted_date)
             if match_template(template, PROBLEM_TEMPLATES):
+                params_to_update = {}
                 for param in template.params[:]:
-                    if str(param) in SCOPE[problem]['problems_parameters']:
+                    param_name = str(param)
+                    if '=' in param_name:
+                        _, param_name = param_name.split('=', 1)
+                    if param_name in SCOPE[problem]['problems_parameters']:
                         template.remove(param)
-                        template.add(str(param), formatted_date)
+                        template.add(param_name, formatted_date)
 
     new_text = str(code)
 
@@ -297,8 +359,11 @@ def find_problems(text):
             problems.add(TEMPLATES_2_PROBLEMS[tmpl_name])
         if tmpl_name in PROBLEM_TEMPLATES:
             for param in tmpl.params:
-                # if str(param) not in PARAMS_2_PROBLEMS:
-                #     continue
+                if not str(param).strip():
+                    continue
+                if str(param) not in PARAMS_2_PROBLEMS:
+                    print("UNKNOWN PARAM", param)
+                    continue
                 problems.add(PARAMS_2_PROBLEMS[str(param)])
     return problems
 
@@ -329,6 +394,8 @@ def ensure_category_existence(site, category_name, added):
 def daylight_throttle():
     """ Work slower at day to not disturb human editors much """
     n = datetime.now()
+    if 'quick' in sys.argv:
+        return
     if 1 < n.hour < 6: # night
         return
     print('"Обідня" перерва')
