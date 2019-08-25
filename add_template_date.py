@@ -9,6 +9,7 @@ import mwparserfromhell
 PROBLEM_TEMPLATES = {
     'проблеми',
     'недоліки',
+    'rq',
 }
 
 SCOPE = {
@@ -152,6 +153,14 @@ SCOPE = {
             'source',
         },
     )
+    'Статті, що потребують додаткових посилань на джерела': dict(
+        template_names={
+            'Refimprovesect',
+        },
+        problems_parameters={
+            'refimprove',
+        }
+    )
 }
 
 '''
@@ -173,12 +182,6 @@ SCOPE = {
         'templateAliases': {u'Cleanup-verify', u'Достовірність', u'Недостовірність', u'Not verified',
                             u'Додаткові джерела', u'More sources', u'Першоджерела'},
         'problemsParameters': {u'недостовірність'},
-        'categoryName': u'Статті, що потребують додаткових посилань на джерела'
-    },
-    {
-        'templateName': u'Refimprovesect',
-        'templateAliases': set(),
-        'problemsParameters': set(),
         'categoryName': u'Статті, що потребують додаткових посилань на джерела'
     },
     {
@@ -221,11 +224,6 @@ SCOPE = {
     },
 '''
 
-ALL_TEMPLATE_NAMES = PROBLEM_TEMPLATES.union({
-    name
-    for work in SCOPE.values()
-    for name in work['template_names']
-})
 TEMPLATES_2_PROBLEMS = {
     template: problem
     for problem, work in SCOPE.items()
@@ -248,8 +246,6 @@ def add_dates(site, category_name, template_names):
 
     for page in pagegenerators.PreloadingGenerator(cat.articles(), 10):
         fix_page(site, page)
-        return
-
 
 def fix_page(site, page):
     print()
@@ -301,6 +297,8 @@ def find_problems(text):
             problems.add(TEMPLATES_2_PROBLEMS[tmpl_name])
         if tmpl_name in PROBLEM_TEMPLATES:
             for param in tmpl.params:
+                # if str(param) not in PARAMS_2_PROBLEMS:
+                #     continue
                 problems.add(PARAMS_2_PROBLEMS[str(param)])
     return problems
 
@@ -313,11 +311,16 @@ def problems_first_noticed(page, current_problems):
             if problem not in problems and problem not in dates:
                 dates[problem] = prev_revision_time
         prev_revision_time = revision.timestamp
+
+    for problem in current_problems: # Set problems from first revision
+        if dates.get(problem) is None:
+            dates[problem] = prev_revision_time
     return dates
 
 def ensure_category_existence(site, category_name, added):
     cat = pywikibot.Category(site, get_category_name_for_date(category_name, added))
     if cat.exists():
+        print(cat, 'існує')
         return
     print("Нема", cat, "створюємо")
     cat.text = '{{Щомісячна категорія впорядкування}}'
