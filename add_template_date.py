@@ -6,126 +6,154 @@ import pywikibot
 from pywikibot import pagegenerators
 import mwparserfromhell
 
-SCOPE = [dict(
-    category_name="Статті з сумнівною значимістю",
-    template_names = {
-        'значимість',
-        'значимість розділу',
-    },
-    problems_parameters = {'notability', 'значимість'},
-), dict(
-    category_name="Статті, які слід категоризувати",
-    template_names = [
-        'без категорій',
-        'категорія',
-        'recat',
-        'категоризувати'
-    ],
-    # 'problemsParameters': {u'cat', u'без категорій'},
-), dict(
-    category_name="Статті до об'єднання",
-    template_names = [
-        'merge from',
-        'merge into',
-        'merge to',
-        'merge with',
-        'merge',
-        'mergefrom',
-        'об’єднати',
-        "об'єднати",
-        "об'єднати з",
-        'приєднати до',
-        'приєднати з',
-        'приєднати',
-    ]
-), dict(
-    category_name='Статті, в яких потрібно виправити стиль',
-    template_names=[
-        'style',
-        'стиль',
-        'стиль розділу',
-        'переписати розділ',
-        'забагато цитат',
-        'надмірне цитування',
-        'скорочення',
-        'unabbr',
-        'абр',
-        'багато скорочень',
-        'розкрити скорочення',
-        'removeabbr',
-        'noabbr',
-        'abbreviations',
-        'abbreviation',
-        'expandabbr',
-        'expandabbrev',
-        'розкрити-скорочення',
-        'розкрити-скор',
-        'розк-скор',
-        'unabbreviate',
-        'abbrev',
-        'реклама',
-    ],
-    # 'problemsParameters': {u'style', u'стиль'}
-    #'problemsParameters': {u'abbr', u'абр'}
-), dict(
-    category_name='Статті, які потрібно переписати',
-    template_names=[
-        'переписати',
-        'rewrite',
-        'cleanup-rewrite',
-        'cleanup rewrite',
-    ]
-), dict(
-    category_name='Статті, які потрібно розширити',
-    template_names=[
-        'розширити',
-        'розширити розділ',
-        'section-stub',
-        'section stub',
-        'sect-stub',
-        'expand',
-        'expand section',
-        'розділ-доробити',
-        'написати підрозділ',
-        'доробити розділ',
-    ]
-), dict(
-    category_name='Статті до вікіфікації',
-    template_names=[
-        'вікіфікувати',
-        'вікіфікувати розділ',
-        'wikify',
-        'wikification',
-        'вікі',
-        'вікіфікація'
-    ],
-    # 'problemsParameters': {u'wikify', u'вікіфікація', u'вікіфікувати'},
-), dict(
-    category_name='Статті, з яких нема посилань',
-    template_names=[
-        'безвихідна стаття',
-        'стаття, з якої нема посилань',
-        'статті, з яких нема посилань',
-        'тупикова стаття',
-    ]
-), dict(
-    category_name='Статті з сумнівною нейтральністю',
-    template_names=[
-        'нейтральність-розділ',
-        'pov-section',
-        'нтз-розділ',
-        'npov',
-        'нтз під питанням',
-        'нтз',
-        'pov',
-        'нейтральність під сумнівом',
-        'нтз під сумнівом',
-        'нейтральність',
-        'перевірити нейтральність',
-        'neutrality',
-    ],
-    # 'problemsParameters': {u'npov', u'НТЗ', u'нейтральність сумнівна'},
-)]
+PROBLEM_TEMPLATES = {
+    'проблеми',
+    'недоліки',
+}
+
+SCOPE = {
+    "Статті з сумнівною значимістю": dict(
+        template_names = {
+            'значимість',
+            'значимість розділу',
+        },
+        problems_parameters = {
+            'notability',
+            'значимість'
+        },
+    ),
+    "Статті, які слід категоризувати": dict(
+        template_names = [
+            'без категорій',
+            'категорія',
+            'recat',
+            'категоризувати'
+        ],
+        # 'problemsParameters': {u'cat', u'без категорій'},
+    ),
+    "Статті до об'єднання": dict(
+        template_names = [
+            'merge from',
+            'merge into',
+            'merge to',
+            'merge with',
+            'merge',
+            'mergefrom',
+            'об’єднати',
+            "об'єднати",
+            "об'єднати з",
+            'приєднати до',
+            'приєднати з',
+            'приєднати',
+        ]
+    ),
+    'Статті, в яких потрібно виправити стиль': dict(
+        template_names=[
+            'style',
+            'стиль',
+            'стиль розділу',
+            'переписати розділ',
+            'забагато цитат',
+            'надмірне цитування',
+            'скорочення',
+            'unabbr',
+            'абр',
+            'багато скорочень',
+            'розкрити скорочення',
+            'removeabbr',
+            'noabbr',
+            'abbreviations',
+            'abbreviation',
+            'expandabbr',
+            'expandabbrev',
+            'розкрити-скорочення',
+            'розкрити-скор',
+            'розк-скор',
+            'unabbreviate',
+            'abbrev',
+            'реклама',
+        ],
+        problems_parameters={'style', 'стиль', 'abbr', 'абр'},
+    ),
+    'Статті, які потрібно переписати': dict(
+        template_names=[
+            'переписати',
+            'rewrite',
+            'cleanup-rewrite',
+            'cleanup rewrite',
+        ]
+    ),
+    'Статті, які потрібно розширити': dict(
+        template_names=[
+            'розширити',
+            'розширити розділ',
+            'section-stub',
+            'section stub',
+            'sect-stub',
+            'expand',
+            'expand section',
+            'розділ-доробити',
+            'написати підрозділ',
+            'доробити розділ',
+        ]
+    ),
+    'Статті до вікіфікації': dict(
+        template_names={
+            'вікіфікувати',
+            'вікіфікувати розділ',
+            'wikify',
+            'wikification',
+            'вікі',
+            'вікіфікація'
+        },
+        problems_parameters={'wikify', 'вікіфікація', 'вікіфікувати'},
+    ),
+    'Статті, з яких нема посилань': dict(
+        template_names=[
+            'безвихідна стаття',
+            'стаття, з якої нема посилань',
+            'статті, з яких нема посилань',
+            'тупикова стаття',
+        ]
+    ),
+    'Статті з сумнівною нейтральністю': dict(
+        template_names=[
+            'нейтральність-розділ',
+            'pov-section',
+            'нтз-розділ',
+            'npov',
+            'нтз під питанням',
+            'нтз',
+            'pov',
+            'нейтральність під сумнівом',
+            'нтз під сумнівом',
+            'нейтральність',
+            'перевірити нейтральність',
+            'neutrality',
+        ],
+        # 'problemsParameters': {u'npov', u'НТЗ', u'нейтральність сумнівна'},
+    ),
+    'Статті без джерел': dict(
+        template_names={
+            'без джерел',
+            'unref',
+            'безджерел',
+            'no sources',
+            'nosources',
+            'джерела',
+            'sources',
+            'unreferenced',
+        },
+        problems_parameters={
+            'sources',
+            'джерела',
+            'без джерел',
+            'refless',
+            'source',
+        },
+    )
+}
+
 '''
     {
         'templateName': u'Оригінальне дослідження',
@@ -152,13 +180,6 @@ SCOPE = [dict(
         'templateAliases': set(),
         'problemsParameters': set(),
         'categoryName': u'Статті, що потребують додаткових посилань на джерела'
-    },
-    {
-        'templateName': u'Без джерел',
-        'templateAliases': {u'Unref', u'БезДжерел', u'No sources', u'Nosources', u'Джерела', u'Sources',
-                            u'Unreferenced'},
-        'problemsParameters': {u'sources', u'джерела', u'без джерел', u'refless', u'source'},
-        'categoryName': u'Статті без джерел'
     },
     {
         'templateName': u'Розділ без джерел',
@@ -200,49 +221,99 @@ SCOPE = [dict(
     },
 '''
 
+ALL_TEMPLATE_NAMES = PROBLEM_TEMPLATES.union({
+    name
+    for work in SCOPE.values()
+    for name in work['template_names']
+})
+TEMPLATES_2_PROBLEMS = {
+    template: problem
+    for problem, work in SCOPE.items()
+    for template in work['template_names']
+}
+PARAMS_2_PROBLEMS = {
+    param: problem
+    for problem, work in SCOPE.items()
+    for param in work.get('problems_parameters', {})
+}
 
 def main():
     site = pywikibot.Site()
-    for work in SCOPE:
-        add_dates(site, work['category_name'], work['template_names'])
+    for category_name, work in SCOPE.items():
+        add_dates(site, category_name, work['template_names'])
 
 def add_dates(site, category_name, template_names):
     print('Розчищаємо', category_name)
     cat = pywikibot.Category(site, 'Категорія:' + category_name)
 
     for page in pagegenerators.PreloadingGenerator(cat.articles(), 10):
-        print()
-        print(page.title())
+        fix_page(site, page)
+        return
 
-        if not has_template(page.text, template_names):
-            print("Не має шаблону", ' або '.join('{{%s}}' % name for name in template_names))
-            continue
 
-        added = when_template_was_added(page, template_names)
-        new_text = page.text
-        if added is not None: # We know when added
-            ensure_category_existence(site, category_name, added)
+def fix_page(site, page):
+    print()
+    print(page.title())
 
-            code = mwparserfromhell.parse(page.text)
-            for template in code.filter_templates():
-                if match_template(template, template_names) and not template.has("дата"):
-                    template.add("дата", get_template_date_for(added))
+    problems = find_problems(page.text)
+    if problems:
+        print('\n'.join(problems))
+    else:
+        print("Не знайдено шаблонів недоліків")
+        return
 
-            new_text = str(code)
-        else:
-            print('Чомусь невідомо коли шаблон додали')
-        new_text = new_text.replace("[[Категорія:%s]]" % category_name, '')
-        pywikibot.showDiff(page.text, new_text)
-        if page.text != new_text:
-            page.text = new_text
-            try:
-                page.save('Додавання дати до шаблону')
-            except Exception as e:
-                print('ERROR', e)
+    noticed = problems_first_noticed(page, problems)
+    new_text = page.text
+    code = mwparserfromhell.parse(page.text)
+    for problem, date in noticed.items():
+        assert date is not None
+        ensure_category_existence(site, problem, date)
+        formatted_date = get_template_date_for(date)
+        for template in code.filter_templates():
+            if match_template(template, SCOPE[problem]['template_names']) and not template.has("дата"):
+                template.add("дата", formatted_date)
+            if match_template(template, PROBLEM_TEMPLATES):
+                for param in template.params[:]:
+                    if str(param) in SCOPE[problem]['problems_parameters']:
+                        template.remove(param)
+                        template.add(str(param), formatted_date)
 
-            daylight_throttle()
+    new_text = str(code)
 
-# {{Проблеми|значимість|вікіфікувати|без виносок}} TODO
+    # new_text = new_text.replace("[[Категорія:%s]]" % category_name, '')
+    pywikibot.showDiff(page.text, new_text)
+    if page.text != new_text:
+        page.text = new_text
+        try:
+            page.save('Додавання дати до шаблону')
+        except Exception as e:
+            print('ERROR', e)
+        daylight_throttle()
+    else:
+        print('Нічого не міняли')
+
+def find_problems(text):
+    problems = set()
+    code = mwparserfromhell.parse(text)
+    for tmpl in code.filter_templates():
+        tmpl_name = normalized_template_name(tmpl)
+        if tmpl_name in TEMPLATES_2_PROBLEMS:
+            problems.add(TEMPLATES_2_PROBLEMS[tmpl_name])
+        if tmpl_name in PROBLEM_TEMPLATES:
+            for param in tmpl.params:
+                problems.add(PARAMS_2_PROBLEMS[str(param)])
+    return problems
+
+def problems_first_noticed(page, current_problems):
+    prev_revision_time = None
+    dates = {}
+    for revision in page.revisions(content=True):
+        problems = find_problems(revision.full_hist_entry().text)
+        for problem in current_problems:
+            if problem not in problems and problem not in dates:
+                dates[problem] = prev_revision_time
+        prev_revision_time = revision.timestamp
+    return dates
 
 def ensure_category_existence(site, category_name, added):
     cat = pywikibot.Category(site, get_category_name_for_date(category_name, added))
@@ -260,20 +331,14 @@ def daylight_throttle():
     print('"Обідня" перерва')
     time.sleep(30)
 
-def when_template_was_added(page, template_names):
-    last_time_saw_template = None
-    for revision in page.revisions(content=True):
-        if not has_template(revision.full_hist_entry().text, template_names):
-            return last_time_saw_template
-        else:
-            last_time_saw_template = revision.timestamp
-    return last_time_saw_template
-
-def match_template(template, template_names):
+def normalized_template_name(template):
     tmpl_name = template.name.lower()
     if tmpl_name.startswith('шаблон:'):
         tmpl_name = tmpl_name[len('шаблон:'):]
-    return tmpl_name in template_names
+    return tmpl_name
+
+def match_template(template, template_names):
+    return normalized_template_name(template) in template_names
 
 def has_template(text, template_names):
     code = mwparserfromhell.parse(text)
