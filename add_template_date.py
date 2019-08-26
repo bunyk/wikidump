@@ -85,12 +85,16 @@ SCOPE = {
         problems_parameters={'style', 'стиль', 'abbr', 'абр'},
     ),
     'Статті, які потрібно переписати': dict(
-        template_names=[
+        template_names={
             'переписати',
             'rewrite',
             'cleanup-rewrite',
             'cleanup rewrite',
-        ]
+            'rewrite-section',
+        },
+        problems_parameters={
+            'переписати',
+        }
     ),
     'Статті, які потрібно розширити': dict(
         template_names=[
@@ -115,7 +119,11 @@ SCOPE = {
             'вікі',
             'вікіфікація'
         },
-        problems_parameters={'wikify', 'вікіфікація', 'вікіфікувати'},
+        problems_parameters={
+            'wikify',
+            'вікіфікація',
+            'вікіфікувати'
+        },
     ),
     'Статті, з яких нема посилань': dict(
         template_names=[
@@ -332,7 +340,7 @@ def fix_page(site, page):
                     param_name = str(param)
                     if '=' in param_name:
                         _, param_name = param_name.split('=', 1)
-                    if param_name in SCOPE[problem]['problems_parameters']:
+                    if any(weak_equal(param_name, param) for param in SCOPE[problem].get('problems_parameters', [])):
                         template.remove(param)
                         template.add(param_name, formatted_date)
 
@@ -361,11 +369,27 @@ def find_problems(text):
             for param in tmpl.params:
                 if not str(param).strip():
                     continue
-                if str(param) not in PARAMS_2_PROBLEMS:
+                if not any(weak_equal(param, p2p) for p2p in PARAMS_2_PROBLEMS):
                     print("UNKNOWN PARAM", param)
                     continue
-                problems.add(PARAMS_2_PROBLEMS[str(param)])
+                for p2p in PARAMS_2_PROBLEMS:
+                    if weak_equal(param, p2p):
+                        problems.add(PARAMS_2_PROBLEMS[p2p])
     return problems
+
+def weak_equal(a, b):
+    a = str(a).strip()
+    b = str(b).strip()
+    if a == b:
+        return True
+    if not a:
+        return False
+    if not b:
+        return False
+    if a[0].lower() != b[0].lower():
+        return False
+    return a[1:] == b[1:]
+
 
 def problems_first_noticed(page, current_problems):
     prev_revision_time = None
@@ -402,21 +426,13 @@ def daylight_throttle():
     time.sleep(30)
 
 def normalized_template_name(template):
-    tmpl_name = template.name.lower()
+    tmpl_name = template.name.lower().strip()
     if tmpl_name.startswith('шаблон:'):
         tmpl_name = tmpl_name[len('шаблон:'):]
-    return tmpl_name
+    return tmpl_name.strip().strip()
 
 def match_template(template, template_names):
     return normalized_template_name(template) in template_names
-
-def has_template(text, template_names):
-    code = mwparserfromhell.parse(text)
-    for tmpl in code.filter_templates():
-        if match_template(tmpl, template_names):
-            return True
-
-    return False
 
 def get_category_name_for_date(category_name, timestamp):
     return 'Категорія:' + category_name + ' з ' + MONTHS_GENITIVE[timestamp.month - 1] + ' ' + str(timestamp.year)
