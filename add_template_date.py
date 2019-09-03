@@ -108,6 +108,8 @@ SCOPE = {
             'розділ-доробити',
             'написати підрозділ',
             'доробити розділ',
+            'дописати розділ',
+            'незакінчений розділ',
         ]
     ),
     'Статті до вікіфікації': dict(
@@ -334,6 +336,14 @@ def fix_page(site, page):
         for template in code.filter_templates():
             if match_template(template, SCOPE[problem]['template_names']) and not template.has("дата"):
                 template.add("дата", formatted_date)
+            '''
+            if match_template(template, SCOPE[problem]['template_names']):
+                if not template.has("дата"):
+                    template.add("дата", formatted_date)
+                else: # template has дата
+                    if not template.get('дата').value.strip():
+                        template.add("дата", formatted_date)
+            '''
             if match_template(template, PROBLEM_TEMPLATES):
                 params_to_update = {}
                 for param in template.params[:]:
