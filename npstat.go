@@ -15,7 +15,9 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
+	"github.com/jmoiron/jsonq"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -47,10 +49,13 @@ func (np *NpStats) Process(page Page) {
 			log.Fatal(r)
 		}
 	}()
-	// fmt.Println("\n\t", page.Title)
 	var altLang, altExisting string
 	var existingSize, altSize int
 	for _, tmpl := range pageTemplates(page.Text) {
+		altLang = ""
+		altExisting = ""
+		existingSize = 0
+		altSize = 0
 		parsed := parseTemplate(tmpl)
 		if parsed.Language == "ru" {
 			altLang, altExisting = getAlternativeTo(parsed.Language, parsed.Existing)
@@ -79,15 +84,19 @@ func (np *NpStats) Summary() {
 	np.db.Close()
 }
 
+func escapeArticle(title string) string {
+	return strings.Replace(url.PathEscape(title), "&", "%26", -1)
+}
+
 // To get alternative languages, do:
 // curl "https://www.wikidata.org/w/api.php?action=wbgetentities&sites=ruwiki&titles=Бечей&format=json" | python -mjson.tool
 func getAlternativeTo(language, article string) (string, string) {
+	time.Sleep(2000 * time.Millisecond)
 	path := fmt.Sprintf(
 		"https://www.wikidata.org/w/api.php?action=wbgetentities&sites=%swiki&titles=%s&format=json",
-		language, url.PathEscape(article),
+		language, escapeArticle(article),
 	)
 	resp, err := http.Get(path)
-	time.Sleep(200 * time.Millisecond)
 	fear(err)
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
@@ -125,16 +134,27 @@ func getAlternativeTo(language, article string) (string, string) {
 
 func getPageSize(language, article string) int {
 	path := fmt.Sprintf(
-		"https://%s.wikipedia.org/w/api.php?action=query&prop=revisions&rvprop=content&format=jsonfm&formatversion=2&titles=%s",
-		language, url.PathEscape(article),
+		"https://%s.wikipedia.org/w/api.php?action=query&prop=revisions&rvprop=content&format=json&formatversion=2&titles=%s",
+		language, escapeArticle(article),
 	)
-	resp, err := http.Get(path)
 	time.Sleep(200 * time.Millisecond)
-
-	fear(err)
+	resp, err := http.Get(path)
+	if err != nil {
+		return 0
+	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
-	return len(body)
+	var data interface{}
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		return 0
+	}
+	jq := jsonq.NewQuery(data)
+	content, err := jq.String("query", "pages", "0", "revisions", "0", "content")
+	if err != nil {
+		return 0
+	}
+	return utf8.RuneCountInString(content)
 }
 
 func parseTemplate(markup string) IwTemplate {

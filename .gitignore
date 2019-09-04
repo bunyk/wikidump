@@ -2,7 +2,10 @@ wikidump
 *.swp
 *.bz2
 *.db
-*.lwp
+
+
+# pywikibot related:
 user-config.py
-throttle.ctrl
+pywikibot.lwp
 apicache-py3/
+throttle.ctrl

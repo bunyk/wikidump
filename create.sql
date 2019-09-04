@@ -15,3 +15,8 @@ CREATE TABLE templates (
     existing_size INT, -- size of existing article
     alt_size INT -- size of alternative
 );
+
+CREATE TABLE http_cache (
+    url TEXT, 
+    response TEXT,
+);
