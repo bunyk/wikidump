@@ -13,12 +13,30 @@ PROBLEM_TEMPLATES = {
 }
 
 SCOPE = {
-    # "Статті, написані занадто складно": dict(
-    #     template_names={
-    #         'незрозуміло',
-    #     },
-    #     problems_parameters={},
-    # ),
+    'Статті, які потрібно розширити': dict(
+        template_names=[
+            'розширити',
+            'розширити розділ',
+            'section-stub',
+            'section stub',
+            'sect-stub',
+            'expand',
+            'expand section',
+            'розділ-доробити',
+            'написати підрозділ',
+            'доробити розділ',
+            'дописати розділ',
+            'незакінчений розділ',
+            'розширити розділ',
+            'заготівля розділу',
+        ]
+    ),
+    "Статті, написані занадто складно": dict(
+        template_names={
+            'незрозуміло',
+        },
+        problems_parameters={},
+    ),
     "Статті з сумнівною значимістю": dict(
         template_names = {
             'значимість',
@@ -55,63 +73,6 @@ SCOPE = {
             'приєднати',
         ]
     ),
-    'Статті, в яких потрібно виправити стиль': dict(
-        template_names=[
-            'style',
-            'стиль',
-            'стиль розділу',
-            'переписати розділ',
-            'забагато цитат',
-            'надмірне цитування',
-            'скорочення',
-            'unabbr',
-            'абр',
-            'багато скорочень',
-            'розкрити скорочення',
-            'removeabbr',
-            'noabbr',
-            'abbreviations',
-            'abbreviation',
-            'expandabbr',
-            'expandabbrev',
-            'розкрити-скорочення',
-            'розкрити-скор',
-            'розк-скор',
-            'unabbreviate',
-            'abbrev',
-            'реклама',
-            'essay-like',
-        ],
-        problems_parameters={'style', 'стиль', 'abbr', 'абр'},
-    ),
-    'Статті, які потрібно переписати': dict(
-        template_names={
-            'переписати',
-            'rewrite',
-            'cleanup-rewrite',
-            'cleanup rewrite',
-            'rewrite-section',
-        },
-        problems_parameters={
-            'переписати',
-        }
-    ),
-    'Статті, які потрібно розширити': dict(
-        template_names=[
-            'розширити',
-            'розширити розділ',
-            'section-stub',
-            'section stub',
-            'sect-stub',
-            'expand',
-            'expand section',
-            'розділ-доробити',
-            'написати підрозділ',
-            'доробити розділ',
-            'дописати розділ',
-            'незакінчений розділ',
-        ]
-    ),
     'Статті до вікіфікації': dict(
         template_names={
             'вікіфікувати',
@@ -119,7 +80,8 @@ SCOPE = {
             'wikify',
             'wikification',
             'вікі',
-            'вікіфікація'
+            'вікіфікація',
+            'доповнити голі посилання',
         },
         problems_parameters={
             'wikify',
@@ -149,6 +111,7 @@ SCOPE = {
             'нейтральність',
             'перевірити нейтральність',
             'neutrality',
+            'нейтральність сумнівна',
         ],
         problems_parameters={
             'нейтральність',
@@ -290,6 +253,48 @@ SCOPE = {
             'переклад',
         },
     ),
+    'Статті, в яких потрібно виправити стиль': dict(
+        template_names=[
+            'style',
+            'стиль',
+            'стиль розділу',
+            'переписати розділ',
+            'забагато цитат',
+            'надмірне цитування',
+            'скорочення',
+            'unabbr',
+            'абр',
+            'багато скорочень',
+            'розкрити скорочення',
+            'removeabbr',
+            'noabbr',
+            'abbreviations',
+            'abbreviation',
+            'expandabbr',
+            'expandabbrev',
+            'розкрити-скорочення',
+            'розкрити-скор',
+            'розк-скор',
+            'unabbreviate',
+            'abbrev',
+            'реклама',
+            'essay-like',
+            'виправити розділ',
+        ],
+        problems_parameters={'style', 'стиль', 'abbr', 'абр'},
+    ),
+    'Статті, які потрібно переписати': dict(
+        template_names={
+            'переписати',
+            'rewrite',
+            'cleanup-rewrite',
+            'cleanup rewrite',
+            'rewrite-section',
+        },
+        problems_parameters={
+            'переписати',
+        }
+    ),
 }
 
 TEMPLATES_2_PROBLEMS = {
@@ -334,16 +339,14 @@ def fix_page(site, page):
         ensure_category_existence(site, problem, date)
         formatted_date = get_template_date_for(date)
         for template in code.filter_templates():
-            if match_template(template, SCOPE[problem]['template_names']) and not template.has("дата"):
-                template.add("дата", formatted_date)
-            '''
+            # if match_template(template, SCOPE[problem]['template_names']) and not template.has("дата"):
+            #     template.add("дата", formatted_date)
             if match_template(template, SCOPE[problem]['template_names']):
                 if not template.has("дата"):
                     template.add("дата", formatted_date)
                 else: # template has дата
                     if not template.get('дата').value.strip():
                         template.add("дата", formatted_date)
-            '''
             if match_template(template, PROBLEM_TEMPLATES):
                 params_to_update = {}
                 for param in template.params[:]:
@@ -437,9 +440,10 @@ def daylight_throttle():
 
 def normalized_template_name(template):
     tmpl_name = template.name.lower().strip()
+    tmpl_name = tmpl_name.replace('_', ' ')
     if tmpl_name.startswith('шаблон:'):
         tmpl_name = tmpl_name[len('шаблон:'):]
-    return tmpl_name.strip().strip()
+    return tmpl_name.strip()
 
 def match_template(template, template_names):
     return normalized_template_name(template) in template_names
