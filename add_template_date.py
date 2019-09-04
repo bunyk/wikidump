@@ -15,20 +15,20 @@ PROBLEM_TEMPLATES = {
 SCOPE = {
     'Статті, які потрібно розширити': dict(
         template_names=[
-            'розширити',
-            'розширити розділ',
-            'section-stub',
-            'section stub',
-            'sect-stub',
-            'expand',
             'expand section',
-            'розділ-доробити',
-            'написати підрозділ',
-            'доробити розділ',
+            'expand',
+            'sect-stub',
+            'section stub',
+            'section-stub',
             'дописати розділ',
-            'незакінчений розділ',
-            'розширити розділ',
+            'доробити розділ',
             'заготівля розділу',
+            'короткий вступ',
+            'написати підрозділ',
+            'незакінчений розділ',
+            'розділ-доробити',
+            'розширити розділ',
+            'розширити',
         ]
     ),
     "Статті, написані занадто складно": dict(
@@ -97,29 +97,6 @@ SCOPE = {
             'тупикова стаття',
         ]
     ),
-    'Статті з сумнівною нейтральністю': dict(
-        template_names=[
-            'нейтральність-розділ',
-            'pov-section',
-            'нтз-розділ',
-            'npov',
-            'нтз під питанням',
-            'нтз',
-            'pov',
-            'нейтральність під сумнівом',
-            'нтз під сумнівом',
-            'нейтральність',
-            'перевірити нейтральність',
-            'neutrality',
-            'нейтральність сумнівна',
-        ],
-        problems_parameters={
-            'нейтральність',
-            'npov',
-            'НТЗ',
-            'нейтральність сумнівна'
-        },
-    ),
     'Статті без джерел': dict(
         template_names={
             'без джерел',
@@ -130,6 +107,7 @@ SCOPE = {
             'джерела',
             'sources',
             'unreferenced',
+            'немає джерел',
         },
         problems_parameters={
             'sources',
@@ -141,16 +119,18 @@ SCOPE = {
     ),
     'Статті, що потребують додаткових посилань на джерела': dict(
         template_names={
-            'refimprovesect',
-            'refimprove',
             'cleanup-verify',
-            'достовірність',
-            'недостовірність',
-            'not verified',
-            'додаткові джерела',
             'more sources',
+            'not verified',
+            'refimprove',
+            'refimprovesect',
+            'додаткові джерела',
+            'достовірність',
+            'мало джерел',
+            'недостовірність',
             'першоджерела',
             'розділ без джерел',
+            'первинні джерела',
         },
         problems_parameters={
             'refimprove',
@@ -220,7 +200,8 @@ SCOPE = {
             'out of date',
             'outdated',
             'oldinformation',
-            'уре1'
+            'уре1',
+            'застаріло',
         },
         problems_parameters={
             'update',
@@ -295,6 +276,29 @@ SCOPE = {
             'переписати',
         }
     ),
+    'Статті з сумнівною нейтральністю': dict(
+        template_names=[
+            'нейтральність-розділ',
+            'pov-section',
+            'нтз-розділ',
+            'npov',
+            'нтз під питанням',
+            'нтз',
+            'pov',
+            'нейтральність під сумнівом',
+            'нтз під сумнівом',
+            'нейтральність',
+            'перевірити нейтральність',
+            'neutrality',
+            'нейтральність сумнівна',
+        ],
+        problems_parameters={
+            'нейтральність',
+            'npov',
+            'НТЗ',
+            'нейтральність сумнівна'
+        },
+    ),
 }
 
 TEMPLATES_2_PROBLEMS = {
@@ -324,42 +328,40 @@ def fix_page(site, page):
     print()
     print(page.title())
 
+    new_text = page.text
     problems = find_problems(page.text)
     if problems:
         print('\n'.join(problems))
+        noticed = problems_first_noticed(page, problems)
+        code = mwparserfromhell.parse(page.text)
+        for problem, date in noticed.items():
+            assert date is not None
+            ensure_category_existence(site, problem, date)
+            formatted_date = get_template_date_for(date)
+            for template in code.filter_templates():
+                if match_template(template, SCOPE[problem]['template_names']):
+                    if not template.has("дата"):
+                        template.add("дата", formatted_date)
+                    else: # template has дата
+                        if not template.get('дата').value.strip():
+                            template.add("дата", formatted_date)
+                if match_template(template, PROBLEM_TEMPLATES):
+                    params_to_update = {}
+                    for param in template.params[:]:
+                        param_name = str(param)
+                        if '=' in param_name:
+                            _, param_name = param_name.split('=', 1)
+                        if any(weak_equal(param_name, param) for param in SCOPE[problem].get('problems_parameters', [])):
+                            template.remove(param)
+                            template.add(param_name, formatted_date)
+
+        new_text = str(code)
     else:
         print("Не знайдено шаблонів недоліків")
-        return
 
-    noticed = problems_first_noticed(page, problems)
-    new_text = page.text
-    code = mwparserfromhell.parse(page.text)
-    for problem, date in noticed.items():
-        assert date is not None
-        ensure_category_existence(site, problem, date)
-        formatted_date = get_template_date_for(date)
-        for template in code.filter_templates():
-            # if match_template(template, SCOPE[problem]['template_names']) and not template.has("дата"):
-            #     template.add("дата", formatted_date)
-            if match_template(template, SCOPE[problem]['template_names']):
-                if not template.has("дата"):
-                    template.add("дата", formatted_date)
-                else: # template has дата
-                    if not template.get('дата').value.strip():
-                        template.add("дата", formatted_date)
-            if match_template(template, PROBLEM_TEMPLATES):
-                params_to_update = {}
-                for param in template.params[:]:
-                    param_name = str(param)
-                    if '=' in param_name:
-                        _, param_name = param_name.split('=', 1)
-                    if any(weak_equal(param_name, param) for param in SCOPE[problem].get('problems_parameters', [])):
-                        template.remove(param)
-                        template.add(param_name, formatted_date)
+    for category_name in SCOPE:
+        new_text = new_text.replace("[[Категорія:%s]]" % category_name, '')
 
-    new_text = str(code)
-
-    # new_text = new_text.replace("[[Категорія:%s]]" % category_name, '')
     pywikibot.showDiff(page.text, new_text)
     if page.text != new_text:
         page.text = new_text
