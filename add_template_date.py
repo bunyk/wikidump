@@ -121,26 +121,33 @@ SCOPE = {
         template_names={
             'cleanup-verify',
             'more sources',
+            'moresources',
             'not verified',
             'refimprove',
             'refimprovesect',
             'додаткові джерела',
             'достовірність',
+            'кращі джерела',
             'мало джерел',
+            'недостатньо джерел',
             'недостовірність',
+            'первинні джерела',
             'першоджерела',
             'розділ без джерел',
-            'первинні джерела',
         },
         problems_parameters={
             'refimprove',
             'недостовірність',
+            'первинні джерела',
         }
     ),
     'Статті без виносок': dict(
         template_names={
             'без виносок',
             'без посилань',
+            'мало виносок',
+            'без приміток',
+            'недостатньо виносок',
         },
         problems_parameters={
             'no footnotes',
@@ -168,7 +175,8 @@ SCOPE = {
             'вичитати',
             'запит на вичитку',
             'помилки',
-            'copy edit'
+            'copy edit',
+            'spelling',
         },
         problems_parameters={
             'mistakes',
@@ -189,6 +197,7 @@ SCOPE = {
         },
         problems_parameters={
             'україніка',
+            'глобалізувати',
         },
     ),
     'Статті, що можуть бути застарілими': dict(
@@ -206,7 +215,7 @@ SCOPE = {
         problems_parameters={
             'update',
             'оновити',
-            'старі дані'
+            'старі дані',
         },
     ),
     'Статті з неавторитетними джерелами': dict(
@@ -220,13 +229,14 @@ SCOPE = {
     ),
     'Статті, які потрібно виправити після перекладу': dict(
         template_names={
-            'автопереклад',
-            'автопереклад старий',
-            'переклад поганої якості',
-            'поганий переклад',
-            'autotranslation',
             'auto-translate',
             'autotranslate',
+            'autotranslation',
+            'автопереклад старий',
+            'автопереклад',
+            'переклад поганої якості',
+            'поганий переклад',
+            'сирий переклад',
         },
         problems_parameters={
             'machine-trans',
@@ -329,11 +339,11 @@ def fix_page(site, page):
     print(page.title())
 
     new_text = page.text
-    problems = find_problems(page.text)
+    code = mwparserfromhell.parse(page.text)
+    problems = find_problems(code)
     if problems:
         print('\n'.join(problems))
         noticed = problems_first_noticed(page, problems)
-        code = mwparserfromhell.parse(page.text)
         for problem, date in noticed.items():
             assert date is not None
             ensure_category_existence(site, problem, date)
@@ -357,7 +367,9 @@ def fix_page(site, page):
 
         new_text = str(code)
     else:
-        print("Не знайдено шаблонів недоліків")
+        print("Не знайдено шаблонів недоліків. Є такі:")
+        for tmpl in code.filter_templates():
+            print('{{%s}}' % normalized_template_name(tmpl))
 
     for category_name in SCOPE:
         new_text = new_text.replace("[[Категорія:%s]]" % category_name, '')
@@ -366,16 +378,19 @@ def fix_page(site, page):
     if page.text != new_text:
         page.text = new_text
         try:
-            page.save('Додавання дати до шаблону')
+            page.save('Впорядкування категорій впорядкування')
         except Exception as e:
             print('ERROR', e)
         daylight_throttle()
     else:
         print('Нічого не міняли')
 
-def find_problems(text):
+def find_problems(code):
+    if isinstance(code, str):
+        code = mwparserfromhell.parse(code)
     problems = set()
-    code = mwparserfromhell.parse(text)
+    if code is None:
+        return problems
     for tmpl in code.filter_templates():
         tmpl_name = normalized_template_name(tmpl)
         if tmpl_name in TEMPLATES_2_PROBLEMS:
