@@ -237,6 +237,9 @@ SCOPE = {
             'переклад поганої якості',
             'поганий переклад',
             'сирий переклад',
+            'грубий переклад',
+            'google transate',
+            'machinetranslation',
         },
         problems_parameters={
             'machine-trans',
@@ -301,6 +304,7 @@ SCOPE = {
             'перевірити нейтральність',
             'neutrality',
             'нейтральність сумнівна',
+            'розділ нтз',
         ],
         problems_parameters={
             'нейтральність',
@@ -368,8 +372,8 @@ def fix_page(site, page):
         new_text = str(code)
     else:
         print("Не знайдено шаблонів недоліків. Є такі:")
-        for tmpl in code.filter_templates():
-            print('{{%s}}' % normalized_template_name(tmpl))
+        templates = set('{{%s}}' % normalized_template_name(tmpl) for tmpl in code.filter_templates())
+        print(', '.join(templates))
 
     for category_name in SCOPE:
         new_text = new_text.replace("[[Категорія:%s]]" % category_name, '')
