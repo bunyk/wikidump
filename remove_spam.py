@@ -8,7 +8,7 @@ from pywikibot import pagegenerators
 from diff_match_patch import diff_match_patch
 
 def main():
-    domains = list(read_domains_list('spamsites.csv'))
+    domains = list(read_domains_list('spamsites.txt'))
     random.shuffle(domains)
     for page in pages_linking_to(domains):
         print()
@@ -54,8 +54,6 @@ def external_links_cleaner(text, domains):
     return '\n'.join(res)
 
 def text_has_domains(text, domains, pattern='/%s/'):
-    for domain in domains:
-        print(pattern % domain)
     return any((pattern % domain) in text for domain in domains)
 
 def pages_linking_to(domains):
@@ -67,10 +65,9 @@ def pages_linking_to(domains):
             yield page
 
 def read_domains_list(filename):
-    with open(filename, newline='') as csvfile:
-        for row in  csv.DictReader(csvfile):
-            for domain in row['url_domain'].split(','):
-                yield domain.strip()
+    with open(filename) as f:
+        for row in f:
+            yield row.strip()
 
 def update_page(page, new_text, description, yes=False):
         if new_text == page.text:
