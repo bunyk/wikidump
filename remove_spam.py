@@ -9,6 +9,7 @@ from diff_match_patch import diff_match_patch
 
 def main():
     domains = list(read_domains_list('spamsites.txt'))
+    domains = [d for d in domains if 'zna' in d]
     random.shuffle(domains)
     for page in pages_linking_to(domains):
         print()
@@ -19,7 +20,7 @@ def main():
         new_text = ref_cleaner(new_text, domains)
         new_text = external_links_cleaner(new_text, domains)
         show_domains_lines(new_text, domains)
-        update_page(page, new_text, 'Забрав посилання на сміттєві ресурси. http://texty.org.ua/d/2018/mnews/', yes=False)
+        update_page(page, new_text, 'Забрав посилання на сміттєві ресурси.', yes=False)
 
 def show_domains_lines(text, domains):
     for line in text.splitlines():
@@ -35,11 +36,13 @@ def ref_cleaner(text, domains):
             wikicode.replace(tag, '{{fact}}')
 
     res = str(wikicode)
-    res = re.sub(r'{{fact}}\s*<ref', '<ref', res)
-    res = re.sub(r'ref>\s*{{fact}}', 'ref>', res)
-    res = re.sub(r'{{fact}}\s*{{Неавторитетне джерело}}', '{{fact}}', res)
-    res = re.sub(r'{{Неавторитетне джерело}}\s*{{fact}}', '{{fact}}', res)
-    res = re.sub(r'(<ref\s+name=.+?\s*/>\s*){{fact}}', r'\1', res)
+    for i in range(10):
+        res = re.sub(r'{{fact}}\s*<ref', '<ref', res)
+        res = re.sub(r'ref>\s*{{fact}}', 'ref>', res)
+        res = re.sub(r'{{fact}}\s*{{Неавторитетне джерело}}', '{{fact}}', res)
+        res = re.sub(r'{{Неавторитетне джерело}}\s*{{fact}}', '{{fact}}', res)
+        res = re.sub(r'{{fact}}\s*{{fact}}', '{{fact}}', res)
+        res = re.sub(r'(<ref\s+name=.+?\s*/>\s*){{fact}}', r'\1', res)
     return res
 
 def external_links_cleaner(text, domains):
