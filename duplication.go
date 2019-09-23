@@ -2,63 +2,129 @@ package main
 
 import (
 	"fmt"
-	"hash/fnv"
 	"log"
-	"net/http"
-	_ "net/http/pprof"
 	"os"
-	"sort"
+	"bufio"
+	"strconv"
+	// "sort"
 )
 
-const PATTERN_SIZE = 100
-const HASHES_ARRAY_SIZE = 10000000
-const TOP_N = 50
+const LIMIT_PAGES = 100000 // 0 for unlimited sample
+const PATTERN_SIZE = 10000
+const HASHES_ARRAY_SIZE = 50000017
+const TOP_N = 100
 const DUPLICATED_TOP = TOP_N * 100
-
-func hash(str []rune) int {
-	h := fnv.New32a()
-	h.Write([]byte(string(str)))
-	return int(h.Sum32()) % HASHES_ARRAY_SIZE
-}
 
 const padding = "                                                  "
 
+
+
 func main() {
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
-	var hash_counts [HASHES_ARRAY_SIZE]int
 	if len(os.Args) < 2 {
 		log.Fatal("Please specify a file to read")
 	}
-	filename := os.Args[1]
-	count := 0
+	topHashCounts(os.Args[1])
+
+	// WRONG!!!!!!!!!!!!!
+	// sort.Ints(hash_counts[:])
+}
+
+func topHashCounts(filename string) {
+	var hash_counts [HASHES_ARRAY_SIZE]byte
+	var i int
+	var base_on_the_left int
+	var hash int
+	base_on_the_left = 1
+	for i = 0; i < PATTERN_SIZE - 1; i++ {
+		base_on_the_left = (base_on_the_left << 16) % HASHES_ARRAY_SIZE
+	}
+	forEachPage(filename, func(page []rune) {
+		if len(page) < PATTERN_SIZE {
+			return
+		}
+		hash = 0
+		for i = 0; i < PATTERN_SIZE; i++ {
+			hash = ((hash << 16) + int(page[i])) % HASHES_ARRAY_SIZE
+		}
+		if hash < 0 {
+			hash += HASHES_ARRAY_SIZE
+		}
+		if hash_counts[hash] < 255 {
+			hash_counts[hash] ++
+		}
+		for ; i < len(page); i++ {
+			hash = ((hash - int(page[i - PATTERN_SIZE])*base_on_the_left) << 16 + int(page[i])) % HASHES_ARRAY_SIZE
+			if hash < 0 {
+				hash += HASHES_ARRAY_SIZE
+			}
+			if hash_counts[hash] < 255 {
+				hash_counts[hash] ++
+			}
+		}
+	})
+	duplicated := 0
+	top := make([][2]int, 0)
+	for _, count := range hash_counts {
+		if count >= 5 {
+			duplicated++
+		}
+	}
+	fmt.Println("Duplicated:", duplicated, (100.0 * duplicated / HASHES_ARRAY_SIZE), "%")
+}
+
+func forEachPage(filename string, cb func([]rune)) {
+	var page []rune
+	var err error
+	var count int
+
+    file, err := os.Open(filename)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer file.Close()
+
 	fmt.Println("Processing dump")
-	for page := range Read(filename) {
-		if page.Redirect != nil {
-			continue // skip redirects
+    scanner := bufio.NewScanner(file)
+    for {
+		if !scanner.Scan() {
+			break
 		}
-		if page.Namespace != 0 {
-			continue // skip non articles
+		title := scanner.Text()
+		if !scanner.Scan() {
+			break
 		}
+		lines, err := strconv.Atoi(scanner.Text())
+		lines ++ // TODO: increment this in dump2txt
+		dieOnErr(err)
+
+		page = page[:0]
+		for i := 0; i < lines; i++ {
+			if !scanner.Scan() {
+				dieOnErr(fmt.Errorf("Less lines than promised"))
+			}
+			page = append(page, []rune(scanner.Text())...)
+		}
+		cb(page)
 		count++
+
 		if count%123 == 0 {
 			fmt.Fprintf(
 				os.Stderr,
-				"\rPages: %d. Processing: %s",
+				"\rProcessed pages: %d. Processing %d characters of: %s",
 				count,
-				(page.Title + padding)[0:50],
+				len(page),
+				(title + padding)[0:50],
 			)
+			if LIMIT_PAGES > 0 && count > LIMIT_PAGES {
+				break
+			}
 		}
-		text := []rune(page.Text)
-		for i := 0; i < len(text)-PATTERN_SIZE; i++ {
-			pattern := text[i : i+PATTERN_SIZE]
-			h := hash(pattern)
-			hash_counts[h]++
-		}
-	}
-	sort.Ints(hash_counts[:])
-	for i := HASHES_ARRAY_SIZE - DUPLICATED_TOP; i < HASHES_ARRAY_SIZE; i++ {
-		fmt.Println(i, hash_counts[i])
+    }
+    dieOnErr(scanner.Err())
+}
+
+func dieOnErr(err error) {
+	if err != nil {
+		log.Fatal(err)
 	}
 }

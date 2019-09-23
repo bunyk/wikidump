@@ -3,10 +3,9 @@ package main
 import (
 	"compress/bzip2"
 	"encoding/xml"
-	"io"
-	"log"
 	"os"
 	"strings"
+	"github.com/eliben/gosax"
 )
 
 type Page struct {
@@ -29,58 +28,36 @@ func (p Page) String() string {
 	return p.Title + redirect + ": " + (p.Text + strings.Repeat(" ", 50))[:50]
 }
 
-func Read(filename string) <-chan Page {
-	out := make(chan Page, 100)
-	go func() {
-		f, err := os.Open(filename)
-		stopOnError(err)
-		decompressedFile := bzip2.NewReader(f)
-		xmlReader := xml.NewDecoder(decompressedFile)
-		for {
-			t, err := xmlReader.Token()
-			if err == io.EOF {
-				close(out)
-				break
-			}
-			stopOnError(err)
-			switch t := t.(type) {
-			case xml.StartElement:
-				if t.Name.Local == "page" {
-					var page Page
-					stopOnError(xmlReader.DecodeElement(&page, &t))
-					stopOnError(err)
-					out <- page
-				}
-			}
-		}
-	}()
-	return out
+type Reader struct {
+	xmlReader *xml.Decoder
 }
 
-func stopOnError(err error) {
+func NewReader(filename string) (*Reader, error) {
+	f, err := os.Open(filename)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
+	return &Reader{
+		xmlReader: xml.NewDecoder(bzip2.NewReader(f)),
+	}, nil
 }
 
-type PageProcessor interface {
-	Init()
-	Process(p Page)
-	Summary()
-}
-
-func RunProcessor(processor PageProcessor, limit int) {
-	if len(os.Args) < 2 {
-		log.Fatal("Please specify a file to read")
-	}
-	processor.Init()
-	processed := 0
-	for page := range Read(os.Args[1]) {
-		if limit >= 0 && processed >= limit {
-			break
+// Returns io.EOF as error in case of end of file
+func (r Reader) NextPage() (*Page, error) {
+	var page Page
+	var err error
+	var token xml.Token
+	for {
+		token, err = r.xmlReader.Token()
+		if err != nil {
+			return nil, err
 		}
-		processed++
-		processor.Process(page)
+		switch token := token.(type) {
+		case xml.StartElement:
+			if token.Name.Local == "page" {
+				err = r.xmlReader.DecodeElement(&page, &token)
+				return &page, err
+			}
+		}
 	}
-	processor.Summary()
 }

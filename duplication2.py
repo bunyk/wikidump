@@ -2,13 +2,12 @@
 
 from collections import Counter
 import gc
-from itertools import islice
 import sys
  
 from pywikibot.xmlreader import XmlDump
 
-LIMIT_PAGES = None # None for unlimited sample
-PATTERN_SIZE = 5000
+LIMIT_PAGES = 10000 # None for unlimited sample
+PATTERN_SIZE = 1000
 HASHES_ARRAY_SIZE = 10000000
 TOP_N = 100
 DUPLICATED_TOP = TOP_N * 100
@@ -17,13 +16,15 @@ DUPLICATED_TOP = TOP_N * 100
 def iter_texts(filename):
     """ Yield page texts from dump given by file name. """
     pages = 0
-    for page in islice(XmlDump(filename).parse(), 0, LIMIT_PAGES):
+    for page in XmlDump(filename).parse():
         if (page.ns != '0') or page.isredirect:
             continue
         yield page.text
         pages += 1
         if pages % 123 == 0:
             print('\rPages: %d. Processing: %s' % (pages, (page.title + ' ' * 70)[:70]), end='')
+            if LIMIT_PAGES and (pages >= LIMIT_PAGES):
+                return
     print()
 
 def iter_patterns_hashes(filename):
@@ -57,6 +58,9 @@ def main():
         return
     filename = sys.argv[1]
  
+    for text in iter_texts(filename):
+        pass
+    return
     top_2n_hashes = get_top_hashes(filename)
 
     print('freeing some memory')
@@ -73,6 +77,8 @@ def main():
     printed = set()
     n = 1
     for el, count in c.most_common(DUPLICATED_TOP):
+        if count == 1:
+            break
         duplicate = False
         for pp in printed:
             if similar(pp, el):
