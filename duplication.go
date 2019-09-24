@@ -1,23 +1,23 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
+	"math/big"
 	"os"
-	"bufio"
 	"strconv"
 	// "sort"
 )
 
 const LIMIT_PAGES = 100000 // 0 for unlimited sample
 const PATTERN_SIZE = 10000
-const HASHES_ARRAY_SIZE = 50000017
+const HASHES_ARRAY_SIZE = 10000000
+const HASHES_COUNT = 5
 const TOP_N = 100
 const DUPLICATED_TOP = TOP_N * 100
 
 const padding = "                                                  "
-
-
 
 func main() {
 	if len(os.Args) < 2 {
@@ -29,13 +29,29 @@ func main() {
 	// sort.Ints(hash_counts[:])
 }
 
+func isPrime(n int) bool {
+	b := big.NewInt(int64(n))
+	return b.ProbablyPrime(20)
+}
+
 func topHashCounts(filename string) {
-	var hash_counts [HASHES_ARRAY_SIZE]byte
 	var i int
+	var hash_counts [HASHES_ARRAY_SIZE][HASHES_COUNT]byte
+
+	var hash_sizes [HASHES_COUNT]int
+	hash_sizes[0] = HASHES_ARRAY_SIZE
+	for i = 0; i < HASHES_COUNT; i++ {
+		if i > 0 {
+			hash_sizes[i] = hash_sizes[i-1]
+		}
+		for !isPrime(hash_sizes[i]) {
+			hash_sizes[i]--
+		}
+	}
 	var base_on_the_left int
 	var hash int
 	base_on_the_left = 1
-	for i = 0; i < PATTERN_SIZE - 1; i++ {
+	for i = 0; i < PATTERN_SIZE-1; i++ {
 		base_on_the_left = (base_on_the_left << 16) % HASHES_ARRAY_SIZE
 	}
 	forEachPage(filename, func(page []rune) {
@@ -50,15 +66,15 @@ func topHashCounts(filename string) {
 			hash += HASHES_ARRAY_SIZE
 		}
 		if hash_counts[hash] < 255 {
-			hash_counts[hash] ++
+			hash_counts[hash]++
 		}
 		for ; i < len(page); i++ {
-			hash = ((hash - int(page[i - PATTERN_SIZE])*base_on_the_left) << 16 + int(page[i])) % HASHES_ARRAY_SIZE
+			hash = ((hash-int(page[i-PATTERN_SIZE])*base_on_the_left)<<16 + int(page[i])) % HASHES_ARRAY_SIZE
 			if hash < 0 {
 				hash += HASHES_ARRAY_SIZE
 			}
 			if hash_counts[hash] < 255 {
-				hash_counts[hash] ++
+				hash_counts[hash]++
 			}
 		}
 	})
@@ -77,15 +93,15 @@ func forEachPage(filename string, cb func([]rune)) {
 	var err error
 	var count int
 
-    file, err := os.Open(filename)
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer file.Close()
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
 
 	fmt.Println("Processing dump")
-    scanner := bufio.NewScanner(file)
-    for {
+	scanner := bufio.NewScanner(file)
+	for {
 		if !scanner.Scan() {
 			break
 		}
@@ -94,7 +110,7 @@ func forEachPage(filename string, cb func([]rune)) {
 			break
 		}
 		lines, err := strconv.Atoi(scanner.Text())
-		lines ++ // TODO: increment this in dump2txt
+		lines++ // TODO: increment this in dump2txt
 		dieOnErr(err)
 
 		page = page[:0]
@@ -107,7 +123,7 @@ func forEachPage(filename string, cb func([]rune)) {
 		cb(page)
 		count++
 
-		if count%123 == 0 {
+		if count%1379 == 0 {
 			fmt.Fprintf(
 				os.Stderr,
 				"\rProcessed pages: %d. Processing %d characters of: %s",
@@ -119,8 +135,8 @@ func forEachPage(filename string, cb func([]rune)) {
 				break
 			}
 		}
-    }
-    dieOnErr(scanner.Err())
+	}
+	dieOnErr(scanner.Err())
 }
 
 func dieOnErr(err error) {
