@@ -35,7 +35,7 @@ func isPrime(n int) bool {
 }
 
 func topHashCounts(filename string) {
-	var i int
+	var i, j int
 	var hash_counts [HASHES_ARRAY_SIZE][HASHES_COUNT]byte
 
 	var hash_sizes [HASHES_COUNT]int
@@ -48,40 +48,58 @@ func topHashCounts(filename string) {
 			hash_sizes[i]--
 		}
 	}
-	var base_on_the_left int
-	var hash int
-	base_on_the_left = 1
+	var base_on_the_left [HASHES_COUNT]int
+	var hashes [HASHES_COUNT]int
+	for i = 0; i < HASHES_COUNT; i++ {
+		base_on_the_left[i] = 1
+	}
 	for i = 0; i < PATTERN_SIZE-1; i++ {
-		base_on_the_left = (base_on_the_left << 16) % HASHES_ARRAY_SIZE
+		for j = 0; j < HASHES_COUNT; j++ {
+			base_on_the_left[j] = (base_on_the_left[j] << 16) % hash_sizes[j]
+		}
 	}
 	forEachPage(filename, func(page []rune) {
 		if len(page) < PATTERN_SIZE {
 			return
 		}
-		hash = 0
+		for j = 0; j < HASHES_COUNT; j++ {
+			hashes[j] = 0
+		}
 		for i = 0; i < PATTERN_SIZE; i++ {
-			hash = ((hash << 16) + int(page[i])) % HASHES_ARRAY_SIZE
+			for j = 0; j < HASHES_COUNT; j++ {
+				hashes[j] = ((hashes[j] << 16) + int(page[i])) % hash_sizes[j]
+			}
 		}
-		if hash < 0 {
-			hash += HASHES_ARRAY_SIZE
-		}
-		if hash_counts[hash] < 255 {
-			hash_counts[hash]++
+		for j = 0; j < HASHES_COUNT; j++ {
+			if hashes[j] < 0 {
+				hashes[j] += hash_sizes[j]
+			}
+			if hash_counts[hashes[j]][j] < 255 {
+				hash_counts[hashes[j]][j]++
+			}
 		}
 		for ; i < len(page); i++ {
-			hash = ((hash-int(page[i-PATTERN_SIZE])*base_on_the_left)<<16 + int(page[i])) % HASHES_ARRAY_SIZE
-			if hash < 0 {
-				hash += HASHES_ARRAY_SIZE
-			}
-			if hash_counts[hash] < 255 {
-				hash_counts[hash]++
+			for j = 0; j < HASHES_COUNT; j++ {
+				hashes[j] = ((hashes[j]-int(page[i-PATTERN_SIZE])*base_on_the_left[j])<<16 + int(page[i])) % hash_sizes[j]
+				if hashes[j] < 0 {
+					hashes[j] += hash_sizes[j]
+				}
+				if hash_counts[hashes[j]][j] < 255 {
+					hash_counts[hashes[j]][j]++
+				}
 			}
 		}
 	})
 	duplicated := 0
-	top := make([][2]int, 0)
 	for _, count := range hash_counts {
-		if count >= 5 {
+		var min_count byte = 255
+		for j = 0; j < HASHES_COUNT; j++ {
+			if count[j] < min_count {
+				min_count = count[j]
+			}
+		}
+		if min_count >= 2 {
+			fmt.Println(count)
 			duplicated++
 		}
 	}
