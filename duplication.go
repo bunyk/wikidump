@@ -10,10 +10,10 @@ import (
 	// "sort"
 )
 
-const LIMIT_PAGES = 100000 // 0 for unlimited sample
+const LIMIT_PAGES = 10000 // 0 for unlimited sample
 const PATTERN_SIZE = 10000
-const HASHES_ARRAY_SIZE = 10000000
-const HASHES_COUNT = 5
+const HASHES_ARRAY_SIZE = 100000000
+const HASHES_COUNT = 2
 const TOP_N = 100
 const DUPLICATED_TOP = TOP_N * 100
 
@@ -37,19 +37,19 @@ func isPrime(n int) bool {
 func topHashCounts(filename string) {
 	var i, j int
 	var hash_counts [HASHES_ARRAY_SIZE][HASHES_COUNT]byte
-
 	var hash_sizes [HASHES_COUNT]int
+	var base_on_the_left [HASHES_COUNT]int
+	var hashes [HASHES_COUNT]int
+
 	hash_sizes[0] = HASHES_ARRAY_SIZE
 	for i = 0; i < HASHES_COUNT; i++ {
 		if i > 0 {
-			hash_sizes[i] = hash_sizes[i-1]
+			hash_sizes[i] = hash_sizes[i-1] - 1
 		}
 		for !isPrime(hash_sizes[i]) {
 			hash_sizes[i]--
 		}
 	}
-	var base_on_the_left [HASHES_COUNT]int
-	var hashes [HASHES_COUNT]int
 	for i = 0; i < HASHES_COUNT; i++ {
 		base_on_the_left[i] = 1
 	}
@@ -90,20 +90,39 @@ func topHashCounts(filename string) {
 			}
 		}
 	})
-	duplicated := 0
-	for _, count := range hash_counts {
-		var min_count byte = 255
+	forEachPage(filename, func(page []rune) {
+		if len(page) < PATTERN_SIZE {
+			return
+		}
 		for j = 0; j < HASHES_COUNT; j++ {
-			if count[j] < min_count {
-				min_count = count[j]
+			hashes[j] = 0
+		}
+		for i = 0; i < PATTERN_SIZE; i++ {
+			for j = 0; j < HASHES_COUNT; j++ {
+				hashes[j] = ((hashes[j] << 16) + int(page[i])) % hash_sizes[j]
 			}
 		}
-		if min_count >= 2 {
-			fmt.Println(count)
-			duplicated++
+		for j = 0; j < HASHES_COUNT; j++ {
+			if hashes[j] < 0 {
+				hashes[j] += hash_sizes[j]
+			}
+			if hash_counts[hashes[j]][j] < 255 {
+				hash_counts[hashes[j]][j]++
+			}
 		}
-	}
-	fmt.Println("Duplicated:", duplicated, (100.0 * duplicated / HASHES_ARRAY_SIZE), "%")
+		for ; i < len(page); i++ {
+			for j = 0; j < HASHES_COUNT; j++ {
+				hashes[j] = ((hashes[j]-int(page[i-PATTERN_SIZE])*base_on_the_left[j])<<16 + int(page[i])) % hash_sizes[j]
+				if hashes[j] < 0 {
+					hashes[j] += hash_sizes[j]
+				}
+				if hash_counts[hashes[j]][j] < 255 {
+					hash_counts[hashes[j]][j]++
+				}
+			}
+		}
+	})
+	fmt.Println(hash_counts[:10])
 }
 
 func forEachPage(filename string, cb func([]rune)) {
@@ -141,7 +160,7 @@ func forEachPage(filename string, cb func([]rune)) {
 		cb(page)
 		count++
 
-		if count%1379 == 0 {
+		if count%379 == 0 {
 			fmt.Fprintf(
 				os.Stderr,
 				"\rProcessed pages: %d. Processing %d characters of: %s",
@@ -150,6 +169,7 @@ func forEachPage(filename string, cb func([]rune)) {
 				(title + padding)[0:50],
 			)
 			if LIMIT_PAGES > 0 && count > LIMIT_PAGES {
+				fmt.Fprintln(os.Stderr, "")
 				break
 			}
 		}
