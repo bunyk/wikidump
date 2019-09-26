@@ -9,7 +9,6 @@ from diff_match_patch import diff_match_patch
 
 def main():
     domains = list(read_domains_list('spamsites.txt'))
-    domains = [d for d in domains if 'zna' in d]
     random.shuffle(domains)
     for page in pages_linking_to(domains):
         print()
