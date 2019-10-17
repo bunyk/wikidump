@@ -196,7 +196,7 @@ wikicodes = [
     "de",
     "fr",
     "war",
-    "r",
+    "ru",
     "ceb",
     "it",
     "es",
@@ -787,12 +787,12 @@ def setSitelink(item, sitename, title, summary):
     if sitename in item.sitelinks.keys():
         if item.sitelinks[sitename] == title:
             pywikibot.output(
-                u'Wikidata item ID (%s) already has a link "%s" to %s'
+                'Wikidata item ID (%s) already has a link "%s" to %s'
                 % (item.id, title, sitename)
             )
         else:
             pywikibot.output(
-                u'You try to set link "%s" to %s for Wikidata item ID (%s) that already has a link "%s"'
+                'You try to set link "%s" to %s for Wikidata item ID (%s) that already has a link "%s"'
                 % (title, sitename, item.id, item.sitelinks[sitename])
             )
         return
@@ -837,7 +837,7 @@ if __name__ == "__main__":
     # bot.run()
     """
     site = pywikibot.Site()
-    catname = u'Біологія'
+    catname = 'Біологія'
     cat = pywikibot.Category(site, catname)
     for subcat in cat.subcategories(recurse=10):
         print subcat.title()

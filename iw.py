@@ -115,7 +115,7 @@ class IwBot(GenBot):
                         except Exception as e:
                             self.addProblem(
                                 page,
-                                "Unexpected error (%s) occured while processing page \03{blue}[[%s]]\03{default}!"
+                                "Unexpected error (%s) occured while processing page [[%s]]!"
                                 % (e, page.title()),
                             )
             except KeyboardInterrupt:
@@ -184,15 +184,13 @@ class IwBot(GenBot):
         except IwExc:
             self.addProblem(
                 page,
-                "Page contains bare \03{blue}{{tl|Не перекладено}}\03{default} without parameters!",
+                "Сторінка містить шаблон {{tl|Не перекладено}} without parameters!",
             )
             return
 
         # Find, whether the page was translated
         if not mova in wikicodes:
-            self.addProblem(
-                page, 'Language code \03{blue}"%s"\03{default} is not supported!' % mova
-            )
+            self.addProblem(page, 'Language code "%s" is not supported!' % mova)
             return
 
         WikidataID = None
@@ -214,9 +212,7 @@ class IwBot(GenBot):
                 raise KeyboardInterrupt
             except:
                 self.addProblem(
-                    page,
-                    "Data item \03{blue}[[:%s:%s]]\03{default} does not exist!"
-                    % (mova, ee),
+                    page, "Data item [[:%s:%s]] does not exist!" % (mova, ee)
                 )
                 return
         else:
@@ -231,9 +227,7 @@ class IwBot(GenBot):
                         redirectTitle = eePage.title()
                 else:
                     self.addProblem(
-                        page,
-                        "\n\n>>> Page \03{blue}[[:%s:%s]]\03{default} does not exist! <<<"
-                        % (mova, ee),
+                        page, "Page [[:%s:%s]] does not exist!" % (mova, ee)
                     )
                     if self.getOption("ignwarn"):
                         if self.user_confirm(
@@ -245,9 +239,7 @@ class IwBot(GenBot):
                 raise KeyboardInterrupt
             except:
                 self.addProblem(
-                    page,
-                    "\n\n>>> Something is wrong with a title \03{blue}[[:%s:%s]]\03{default}! <<<"
-                    % (mova, ee),
+                    page, "Something is wrong with a title [[:%s:%s]]!" % (mova, ee)
                 )
                 return
 
@@ -264,14 +256,13 @@ class IwBot(GenBot):
                 if redirect:
                     self.addProblem(
                         page,
-                        "\n\n>>> Page \03{blue}[[:%s:%s]] (← [[:%s:%s]])\03{default} does not have Wikidata element! <<<"
+                        "Page [[:%s:%s]] (← [[:%s:%s]]) does not have Wikidata element!"
                         % (mova, redirectTitle, mova, ee),
                     )
                 else:
                     self.addProblem(
                         page,
-                        "\n\n>>> Page \03{blue}[[:%s:%s]]\03{default} does not have Wikidata element! <<<"
-                        % (mova, ee),
+                        "Page [[:%s:%s]] does not have Wikidata element!" % (mova, ee),
                     )
                 return
 
@@ -294,17 +285,11 @@ class IwBot(GenBot):
                 raise KeyboardInterrupt
             except:
                 self.addProblem(
-                    page,
-                    "\n\n>>> Something is wrong with a title \03{blue}%s\03{default}! <<<"
-                    % (conv2wikilink(treba)),
+                    page, "Something is wrong with a title %s!" % (conv2wikilink(treba))
                 )
                 return
         else:
-            self.addProblem(
-                page,
-                "\n\n>>> Template \03{blue}%s\03{default} does not have any page title! <<<"
-                % iw.text,
-            )
+            self.addProblem(page, "Template %s does not have any page title!" % iw.text)
             return
 
         if HEREexist:
@@ -317,8 +302,7 @@ class IwBot(GenBot):
             except:
                 self.addProblem(
                     page,
-                    "\n\n>>> Page \03{blue}%s\03{default} does not have Wikidata element! <<<"
-                    % conv2wikilink(treba),
+                    "Page %s does not have Wikidata element!" % conv2wikilink(treba),
                 )
                 return
 
@@ -358,7 +342,7 @@ class IwBot(GenBot):
                 else:
                     self.addProblem(
                         page,
-                        "\n\n>>> Page \03{blue}%s\03{default} redirects to \03{blue}%s\03{default}! <<<"
+                        "Page %s redirects to %s!"
                         % (conv2wikilink(treba), conv2wikilink(HEREredirectTitle)),
                     )
                     if self.getOption("ignwarn"):
@@ -427,7 +411,7 @@ class IwBot(GenBot):
             else:
                 self.addProblem(
                     page,
-                    "\n\n>>> Pages \03{blue}[[:%s:%s]]\03{default} and \03{blue}%s\03{default} link to different Wikidata items! <<<"
+                    "Pages [[:%s:%s]] and %s link to different Wikidata items!"
                     % (mova, ee, conv2wikilink(treba)),
                 )
                 return
@@ -435,7 +419,7 @@ class IwBot(GenBot):
             if redirect:
                 self.addProblem(
                     page,
-                    "\n\n>>> Page \03{blue}[[:%s:%s]] (→ [[:%s:%s]])\03{default} is translated into \03{blue}%s\03{default}, while requested \03{blue}%s\03{default}! <<<"
+                    "Page [[:%s:%s]] (→ [[:%s:%s]]) is translated into %s, while requested %s!"
                     % (
                         mova,
                         ee,
@@ -448,7 +432,7 @@ class IwBot(GenBot):
             else:
                 self.addProblem(
                     page,
-                    "\n\n>>> Page \03{blue}[[:%s:%s]]\03{default} is translated into \03{blue}%s\03{default}, while requested \03{blue}%s\03{default}! <<<"
+                    "Page [[:%s:%s]] is translated into %s, while requested %s!"
                     % (mova, ee, conv2wikilink(tranlsatedInto), conv2wikilink(treba)),
                 )
 
@@ -481,12 +465,8 @@ class IwBot(GenBot):
         page_title = page.title()
         if not page_title in self.problems.keys():
             self.problems[page_title] = []
-        plainmessage = re.sub(r"\03\{[^}]*\}", r"", message, re.UNICODE)
-        plainmessage = re.sub(r"\n\n>>> ", r"", plainmessage, re.UNICODE)
-        plainmessage = re.sub(r" <<<", r"", plainmessage, re.UNICODE)
-        plainmessage = re.sub(r"!", r"", plainmessage, re.UNICODE)
-        self.problems[page_title].append(plainmessage)
-        pywikibot.output(message)
+        self.problems[page_title].append(message)
+        pywikibot.output("\n\n>>> " + message)
         self.ok = False
 
     def iwreplace(self, pageText, iw, treba="", tekst=""):
@@ -744,12 +724,10 @@ class ReportByTopicBot(GenBot):
         self.generalPages = {
             "Report": {
                 "title": "Користувач:PavloChemBot/Неперекладені сторінки",
-                #'title': 'PavloChemBot/Неперекладені сторінки',
                 "minNoRequests": 100,
             },
-            "Problems": 'Користувач:PavloChemBot/Сторінки з невірно використаним шаблоном "Не перекладено"',
+            "Problems": 'Користувач:BunykBot/Сторінки з неправильно використаним шаблоном "Не перекладено"',
         }
-        #'PavloChemBot/Сторінки з невірно використаним шаблоном "Не перекладено"'}
 
         self.topics = {}
         site = pywikibot.Site("uk", "wikipedia")
@@ -788,7 +766,6 @@ class ReportByTopicBot(GenBot):
                 IwBot().run()
             return
 
-        # self.iwrobot = IwBot(locargs = ['-ref:Шаблон:Не перекладено', '-catr:Навігаційні шаблони:Математика', '-maxpages:10', '-intersect', '-report'])
         if self.getOption("dumpreport"):
             self.iwrobot = IwBot(
                 locargs=["-ref:Шаблон:Не перекладено", "-report", "-dumpreport"]
@@ -1084,13 +1061,14 @@ class ReportByTopicBot(GenBot):
 
 
 if __name__ == "__main__":
-    # IwBot(locargs = ['-page:Користувач:Pavlo Chemist/Чернетка', '-report']).run()
-    # IwBot(locargs = ['-page:Користувач:Pavlo Chemist/Чернетка']).run()
     # IwBot(locargs = ['-cat:Вікіпедія:Статті з неактуальним шаблоном Не перекладено']).run()
     # IwBot().run()
-    # python pwb.py iw -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено"
-    # python pwb.py iw -ref:"Шаблон:Не перекладено" -report
-    # python pwb.py iw -page:"Користувач:Pavlo Chemist/Чернетка"
+    # python iw.py -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено"
+    # python iw.py -ref:"Шаблон:Не перекладено" -report
+    # python iw.py -page:"Користувач:Pavlo Chemist/Чернетка"
+
+    # Run with report:
+    # python3.6 iw.py -maxpages:200 -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено" -dumpreport -report -always
 
     robot = ReportByTopicBot()
     robot.run()
