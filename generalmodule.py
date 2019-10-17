@@ -73,7 +73,7 @@ class GenBot(Bot):
             else:
                 splarg = arg.split(':')
                 argcmd = splarg[0]
-                optname = addargs[argcmd].keys()[0]
+                optname = list(addargs[argcmd].keys())[0]
                 if len(splarg) == 1:
                     options[optname] = True
                 elif len(splarg) == 2:
@@ -82,7 +82,7 @@ class GenBot(Bot):
                 elif len(splarg) > 2:
                     splreg = re.search(r'(?P<argcmd>.*?)\:(?P<argvalue>.*)', arg, flags=re.UNICODE | re.MULTILINE | re.DOTALL | re.IGNORECASE)
                     if splreg:
-                        options[optname] = splreg.group(u'argvalue')
+                        options[optname] = splreg.group('argvalue')
 
         old = False # On non-updated Windows machine, where -cat and -catr work
         if old:
@@ -97,14 +97,14 @@ class GenBot(Bot):
         else:
             for arg in catrargs:
                 recurse = False
-                catname = u''
+                catname = ''
                 if arg.startswith('-catr:'):
                     recurse = True
                     if not options['catrdepth'] == 'infinite':
                         recurse = int(options['catrdepth'])
-                    catname = arg[len(u'-catr:'):]
+                    catname = arg[len('-catr:'):]
                 elif arg.startswith('-cat:'):
-                    catname = arg[len(u'-cat:'):]
+                    catname = arg[len('-cat:'):]
                 gen = genFactory.getCategoryGen(catname, recurse=recurse,
                                           gen_func=pagegenerators.CategorizedPageGenerator)
                 if gen:
@@ -125,10 +125,10 @@ class GenBot(Bot):
     @classmethod
     def findInterwiki(cls, page):
         iwikis = {}
-        for iwiki in re.finditer(u'\[\[(?P<lang>[a-z-]+)\:(?P<title>[^]]+)\]\]', page.text, flags=re.UNICODE | re.MULTILINE | re.DOTALL | re.IGNORECASE):
-            lang = iwiki.group(u'lang')
+        for iwiki in re.finditer('\[\[(?P<lang>[a-z-]+)\:(?P<title>[^]]+)\]\]', page.text, flags=re.UNICODE | re.MULTILINE | re.DOTALL | re.IGNORECASE):
+            lang = iwiki.group('lang')
             if lang in wikicodes:
-                iwikis[lang] = iwiki.group(u'title')
+                iwikis[lang] = iwiki.group('title')
         return iwikis
 
     @classmethod
@@ -139,14 +139,14 @@ class GenBot(Bot):
 
         if sitename in item.sitelinks.keys():
             if item.sitelinks[sitename] == title:
-                pywikibot.output(u'Wikidata item ID (%s) already has a link "%s" to %s' %
+                pywikibot.output('Wikidata item ID (%s) already has a link "%s" to %s' %
                                  (item.id, title, sitename))
             else:
-                pywikibot.output(u'You try to set link "%s" to %s for Wikidata item ID (%s) that already has a link "%s"' %
+                pywikibot.output('You try to set link "%s" to %s for Wikidata item ID (%s) that already has a link "%s"' %
                                  (title, sitename, item.id, item.sitelinks[sitename]))
             return
 
-        if self.user_confirm(u'Do you want to set link %s:%s to the Wikidata?' % (sitename, title)):
+        if self.user_confirm('Do you want to set link %s:%s to the Wikidata?' % (sitename, title)):
             if item:
                 item.setSitelink(sitelink={'site': sitename, 'title': title}, summary=summary)
 
@@ -166,51 +166,51 @@ class testBot(GenBot):
             print('TESTARG = ', self.getOption('testarg'))
         for page in self.generator:
             print(page.title())
-            #self.userPut(page, page.text, u'', summary='Test edit')
+            #self.userPut(page, page.text, '', summary='Test edit')
 
 
-wikicodes = [u'en', u'sv', u'nl', u'de', u'fr', u'war', u'ru', u'ceb', u'it',
-             u'es', u'vi', u'pl', u'ja', u'pt', u'zh', u'uk', u'ca', u'fa',
-             u'no', u'sh', u'fi', u'ar', u'id', u'ro', u'cs', u'sr', u'ko',
-             u'hu', u'ms', u'tr', u'min', u'eo', u'kk', u'eu', u'sk', u'da',
-             u'bg', u'he', u'lt', u'hy', u'hr', u'sl', u'et', u'uz', u'gl',
-             u'nn', u'vo', u'la', u'simple', u'el', u'hi', u'az', u'ka', u'th',
-             u'ce', u'oc', u'be', u'mk', u'mg', u'new', u'ur', u'ta', u'tt',
-             u'pms', u'cy', u'tl', u'bs', u'lv', u'te', u'be-x-old', u'br',
-             u'ht', u'sq', u'jv', u'lb', u'mr', u'is', u'ml', u'zh-yue', u'bn',
-             u'af', u'ga', u'ba', u'pnb', u'cv', u'tg', u'fy', u'lmo', u'sco',
-             u'my', u'yo', u'an', u'ky', u'sw', u'ne', u'io', u'gu', u'scn',
-             u'bpy', u'nds', u'ku', u'ast', u'qu', u'als', u'su', u'pa', u'kn',
-             u'ckb', u'mn', u'ia', u'nap', u'bug', u'bat-smg', u'arz', u'wa',
-             u'zh-min-nan', u'am', u'gd', u'map-bms', u'yi', u'mzn', u'si',
-             u'fo', u'bar', u'nah', u'vec', u'sah', u'os', u'sa', u'mrj',
-             u'li', u'roa-tara', u'hsb', u'or', u'pam', u'mhr', u'se', u'mi',
-             u'ilo', u'bcl', u'hif', u'gan', u'ps', u'rue', u'glk', u'nds-nl',
-             u'bo', u'vls', u'diq', u'bh', u'fiu-vro', u'xmf', u'tk', u'gv',
-             u'sc', u'co', u'csb', u'km', u'hak', u'vep', u'kv', u'zea',
-             u'crh', u'frr', u'zh-classical', u'eml', u'ay', u'wuu', u'udm',
-             u'stq', u'nrm', u'kw', u'rm', u'so', u'szl', u'koi', u'as',
-             u'lad', u'fur', u'mt', u'gn', u'dv', u'ie', u'dsb', u'pcd',
-             u'sd', u'lij', u'cbk-zam', u'cdo', u'ksh', u'ext', u'mwl',
-             u'gag', u'ang', u'ug', u'ace', u'pi', u'pag', u'lez', u'nv',
-             u'frp', u'sn', u'kab', u'myv', u'ln', u'pfl', u'xal', u'krc',
-             u'haw', u'rw', u'kaa', u'pdc', u'to', u'kl', u'arc', u'nov',
-             u'kbd', u'av', u'bxr', u'lo', u'bjn', u'ha', u'tet', u'tpi',
-             u'pap', u'na', u'lbe', u'jbo', u'ty', u'mdf', u'tyv', u'roa-rup',
-             u'wo', u'ig', u'srn', u'nso', u'kg', u'ab', u'ltg', u'zu', u'om',
-             u'chy', u'za', u'cu', u'rmy', u'tw', u'mai', u'tn', u'chr', u'pih',
-             u'xh', u'bi', u'got', u'sm', u'ss', u'mo', u'rn', u'ki', u'pnt',
-             u'bm', u'iu', u'ee', u'lg', u'ak', u'ts', u'fj', u'ik', u'st',
-             u'sg', u'ks', u'ff', u'dz', u'ny', u'ch', u'ti', u've', u'tum',
-             u'cr', u'ng', u'cho', u'kj', u'mh', u'ho', u'ii', u'aa', u'mus',
-             u'hz', u'kr',
-             u'be-tarask', u'cz', u'd'] # Aliases and Wikidata
+wikicodes = ['en', 'sv', 'nl', 'de', 'fr', 'war', 'r', 'ceb', 'it',
+             'es', 'vi', 'pl', 'ja', 'pt', 'zh', 'uk', 'ca', 'fa',
+             'no', 'sh', 'fi', 'ar', 'id', 'ro', 'cs', 'sr', 'ko',
+             'h', 'ms', 'tr', 'min', 'eo', 'kk', 'e', 'sk', 'da',
+             'bg', 'he', 'lt', 'hy', 'hr', 'sl', 'et', 'uz', 'gl',
+             'nn', 'vo', 'la', 'simple', 'el', 'hi', 'az', 'ka', 'th',
+             'ce', 'oc', 'be', 'mk', 'mg', 'new', 'ur', 'ta', 'tt',
+             'pms', 'cy', 'tl', 'bs', 'lv', 'te', 'be-x-old', 'br',
+             'ht', 'sq', 'jv', 'lb', 'mr', 'is', 'ml', 'zh-yue', 'bn',
+             'af', 'ga', 'ba', 'pnb', 'cv', 'tg', 'fy', 'lmo', 'sco',
+             'my', 'yo', 'an', 'ky', 'sw', 'ne', 'io', 'g', 'scn',
+             'bpy', 'nds', 'k', 'ast', 'q', 'als', 's', 'pa', 'kn',
+             'ckb', 'mn', 'ia', 'nap', 'bug', 'bat-smg', 'arz', 'wa',
+             'zh-min-nan', 'am', 'gd', 'map-bms', 'yi', 'mzn', 'si',
+             'fo', 'bar', 'nah', 'vec', 'sah', 'os', 'sa', 'mrj',
+             'li', 'roa-tara', 'hsb', 'or', 'pam', 'mhr', 'se', 'mi',
+             'ilo', 'bcl', 'hif', 'gan', 'ps', 'rue', 'glk', 'nds-nl',
+             'bo', 'vls', 'diq', 'bh', 'fiu-vro', 'xmf', 'tk', 'gv',
+             'sc', 'co', 'csb', 'km', 'hak', 'vep', 'kv', 'zea',
+             'crh', 'frr', 'zh-classical', 'eml', 'ay', 'wuu', 'udm',
+             'stq', 'nrm', 'kw', 'rm', 'so', 'szl', 'koi', 'as',
+             'lad', 'fur', 'mt', 'gn', 'dv', 'ie', 'dsb', 'pcd',
+             'sd', 'lij', 'cbk-zam', 'cdo', 'ksh', 'ext', 'mwl',
+             'gag', 'ang', 'ug', 'ace', 'pi', 'pag', 'lez', 'nv',
+             'frp', 'sn', 'kab', 'myv', 'ln', 'pfl', 'xal', 'krc',
+             'haw', 'rw', 'kaa', 'pdc', 'to', 'kl', 'arc', 'nov',
+             'kbd', 'av', 'bxr', 'lo', 'bjn', 'ha', 'tet', 'tpi',
+             'pap', 'na', 'lbe', 'jbo', 'ty', 'mdf', 'tyv', 'roa-rup',
+             'wo', 'ig', 'srn', 'nso', 'kg', 'ab', 'ltg', 'z', 'om',
+             'chy', 'za', 'c', 'rmy', 'tw', 'mai', 'tn', 'chr', 'pih',
+             'xh', 'bi', 'got', 'sm', 'ss', 'mo', 'rn', 'ki', 'pnt',
+             'bm', 'i', 'ee', 'lg', 'ak', 'ts', 'fj', 'ik', 'st',
+             'sg', 'ks', 'ff', 'dz', 'ny', 'ch', 'ti', 've', 'tum',
+             'cr', 'ng', 'cho', 'kj', 'mh', 'ho', 'ii', 'aa', 'mus',
+             'hz', 'kr',
+             'be-tarask', 'cz', 'd'] # Aliases and Wikidata
 
 class TmplError(Exception):
     def __init__(self, message):
         self.message = message
     def __repr__(self):
-        return u'Template "%s" is probably broken' % self.message
+        return 'Template "%s" is probably broken' % self.message
 
 class TmplCls():
     def __init__(self):
@@ -234,12 +234,12 @@ class TmplOps(object):
     def findTmpls(cls, text, tmpl):
         # Find all <nowiki> ... </nowiki> tags
         nowikis = []
-        for nowiki in re.finditer(u'\<nowiki\>.*?\<\/nowiki\>', text, flags=re.UNICODE | re.MULTILINE | re.DOTALL | re.IGNORECASE):
+        for nowiki in re.finditer('\<nowiki\>.*?\<\/nowiki\>', text, flags=re.UNICODE | re.MULTILINE | re.DOTALL | re.IGNORECASE):
             nowikis.append({'start': nowiki.start(), 'end': nowiki.end()})
         
         # Find starting positions of all '{{ <Tmpl>...' and '{{ <tmpl>...'
         lTmpls = []
-        retmpl = u'\{\{\s*[' + tmpl[0:1].upper() + tmpl[0:1].lower() + u']' + tmpl[1:] + u'\s*[}|]'
+        retmpl = '\{\{\s*[' + tmpl[0:1].upper() + tmpl[0:1].lower() + ']' + tmpl[1:] + '\s*[}|]'
         tOpens = re.compile(retmpl)
         for tOpen in list(tOpens.finditer(text)):
             # Ignore everything within <nowiki> ... </nowiki> tags
@@ -267,10 +267,10 @@ class TmplOps(object):
             Ncfound2 = 0
             for symb in text[(tmplStart + 2 + len(tmpl)):]:
                 tmplEnd += 1
-                if symb == u'{':
+                if symb == '{':
                     Nofound += 1
                     ignore = True
-                elif symb == u'}':
+                elif symb == '}':
                     Ncfound += 1
                     if Ncfound > Nofound:
                         if len(fields) > 0:
@@ -279,14 +279,14 @@ class TmplOps(object):
                         break
                     elif Ncfound == Nofound:
                         ignore = False
-                elif symb == u'[':
+                elif symb == '[':
                     Nofound2 += 1
                     ignore2 = True
-                elif symb == u']':
+                elif symb == ']':
                     Ncfound2 += 1
                     if Ncfound2 == Nofound2:
                         ignore2 = False
-                elif symb == u'|' and not ignore and not ignore2:
+                elif symb == '|' and not ignore and not ignore2:
                     field = FieldCls()
                     field.start = tmplEnd
                     if len(fields) > 0:
@@ -304,7 +304,7 @@ class TmplOps(object):
             lTmpls[itmpl].fields = fields
 
             '''
-            print u'"%s"' % lTmpls[itmpl].text
+            print '"%s"' % lTmpls[itmpl].text
             for field in lTmpls[itmpl].fields:
                 print field.start, field.end
                 print text[field.start:field.end]
@@ -327,9 +327,9 @@ class TmplOps(object):
                 fieldValue = re.search(r'\|\s*%s\s*\=\s*(?P<value>.*)' % fieldName, field.text, flags=re.UNICODE | re.MULTILINE | re.DOTALL | re.IGNORECASE)
                 if fieldValue:
                     if getFieldN:
-                        return fieldValue.group(u'value').strip(), ifieldN
+                        return fieldValue.group('value').strip(), ifieldN
                     else:
-                        return fieldValue.group(u'value').strip()
+                        return fieldValue.group('value').strip()
 
         if getFieldN:
             return None, None
@@ -354,7 +354,7 @@ class TmplOps(object):
         
         # Get numbered fields:
         for iname in range(len(lfieldnames)):
-            lnumfields[iname], lnumfieldpos[iname] = cls.getField(tmpl, fieldName=u'%d' % (iname + 1), getFieldN = True)
+            lnumfields[iname], lnumfieldpos[iname] = cls.getField(tmpl, fieldName='%d' % (iname + 1), getFieldN = True)
         #print lnumfields, lnumfieldpos
             
         # Get unnamed fields:
@@ -364,7 +364,7 @@ class TmplOps(object):
             fieldtemp = cls.getField(tmpl, fieldN = ipos)
             if fieldtemp == None:
                 break
-            if u'=' in fieldtemp:
+            if '=' in fieldtemp:
                 continue
             else:
                 lunnamfields.append(fieldtemp)
@@ -374,17 +374,17 @@ class TmplOps(object):
         # Get final fields according to priorities
         for iname in range(len(lfieldnames)):
             # named fields always overwrite other fields
-            if not (lnamedfields[iname] == None or lnamedfields[iname] == u''):
+            if not (lnamedfields[iname] == None or lnamedfields[iname] == ''):
                 lfields[iname] = lnamedfields[iname]
                 lfieldpos[iname] = lnamedfieldpos[iname]
             # otherwise the second appearance overwrites the first one
-            if lfields[iname] == None or lfields[iname] == u'':
-                if not (lnumfields[iname] == None or lnumfields[iname] == u''):
+            if lfields[iname] == None or lfields[iname] == '':
+                if not (lnumfields[iname] == None or lnumfields[iname] == ''):
                     lfields[iname] = lnumfields[iname]
                     lfieldpos[iname] = lnumfieldpos[iname]
                 if iname < len(lunnamfields):
-                    if not (lunnamfields[iname] == None or lunnamfields[iname] == u''):
-                        if not (lnumfields[iname] == None or lnumfields[iname] == u''):
+                    if not (lunnamfields[iname] == None or lunnamfields[iname] == ''):
+                        if not (lnumfields[iname] == None or lnumfields[iname] == ''):
                             if lunnamfieldpos[iname] < lnumfieldpos[iname]:
                                 continue
                         lfields[iname] = lunnamfields[iname]
@@ -397,24 +397,24 @@ class TmplOps(object):
             return lfields
 
 def conv2wikilink(text):
-    wikilinktext = u''
-    if text[0:5] == u'Файл:':
-        wikilinktext = u'[[:%s]]' % text
-    elif text[0:10] == u'Категорія:':
-        wikilinktext = u'[[:%s]]' % text
+    wikilinktext = ''
+    if text[0:5] == 'Файл:':
+        wikilinktext = '[[:%s]]' % text
+    elif text[0:10] == 'Категорія:':
+        wikilinktext = '[[:%s]]' % text
     else:
-        wikilinktext = u'[[%s]]' % text
+        wikilinktext = '[[%s]]' % text
     return wikilinktext
 
 def dump_obj(obj, name):
-    import cPickle
+    import pickle
     with open(name + '.pkl', 'wb') as f:
-        cPickle.dump(obj, f, cPickle.HIGHEST_PROTOCOL)
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
 def load_obj(name):
-    import cPickle
+    import pickle
     with open(name + '.pkl', 'rb') as f:
-        return cPickle.load(f)
+        return pickle.load(f)
 
 ''' EVERYTHING BELOW IS DEPRICATED - DO NOT USE IT IN NEW SCRIPTS!!!'''
 Ntotal        = 0
