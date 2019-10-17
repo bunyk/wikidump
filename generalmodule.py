@@ -38,9 +38,10 @@ class GenBot(Bot):
         addargs['-catrdepth'] = {'catrdepth': 'infinite'}
         for key in addargs.keys():
             arg = addargs[key]
+            k, v = list(arg.items())[0]
             self.availableOptions.update({
-                arg.keys()[0]: arg.values()[0],
-                })
+                k: v
+            })
         
         self.botsite = None
         pywikibot._sites = {}
@@ -79,7 +80,7 @@ class GenBot(Bot):
                     argvalue = splarg[1]
                     options[optname] = argvalue
                 elif len(splarg) > 2:
-                    splreg = re.search(ur'(?P<argcmd>.*?)\:(?P<argvalue>.*)', arg, flags=re.UNICODE | re.MULTILINE | re.DOTALL | re.IGNORECASE)
+                    splreg = re.search(r'(?P<argcmd>.*?)\:(?P<argvalue>.*)', arg, flags=re.UNICODE | re.MULTILINE | re.DOTALL | re.IGNORECASE)
                     if splreg:
                         options[optname] = splreg.group(u'argvalue')
 
@@ -162,9 +163,9 @@ class testBot(GenBot):
         
     def run(self):
         if self.getOption('testarg'):
-            print 'TESTARG = ', self.getOption('testarg')
+            print('TESTARG = ', self.getOption('testarg'))
         for page in self.generator:
-            print page.title()
+            print(page.title())
             #self.userPut(page, page.text, u'', summary='Test edit')
 
 
@@ -323,7 +324,7 @@ class TmplOps(object):
         if fieldName:
             for field in tmpl.fields:
                 ifieldN += 1
-                fieldValue = re.search(ur'\|\s*%s\s*\=\s*(?P<value>.*)' % fieldName, field.text, flags=re.UNICODE | re.MULTILINE | re.DOTALL | re.IGNORECASE)
+                fieldValue = re.search(r'\|\s*%s\s*\=\s*(?P<value>.*)' % fieldName, field.text, flags=re.UNICODE | re.MULTILINE | re.DOTALL | re.IGNORECASE)
                 if fieldValue:
                     if getFieldN:
                         return fieldValue.group(u'value').strip(), ifieldN
@@ -347,12 +348,12 @@ class TmplOps(object):
         lunnamfieldpos = []
 
         # Get named fields:
-        for iname in xrange(len(lfieldnames)):
+        for iname in range(len(lfieldnames)):
             lnamedfields[iname], lnamedfieldpos[iname] = cls.getField(tmpl, fieldName=lfieldnames[iname], getFieldN = True)
         #print lnamedfields, lnamedfieldpos
         
         # Get numbered fields:
-        for iname in xrange(len(lfieldnames)):
+        for iname in range(len(lfieldnames)):
             lnumfields[iname], lnumfieldpos[iname] = cls.getField(tmpl, fieldName=u'%d' % (iname + 1), getFieldN = True)
         #print lnumfields, lnumfieldpos
             
@@ -371,7 +372,7 @@ class TmplOps(object):
         #print lunnamfields, lunnamfieldpos
         
         # Get final fields according to priorities
-        for iname in xrange(len(lfieldnames)):
+        for iname in range(len(lfieldnames)):
             # named fields always overwrite other fields
             if not (lnamedfields[iname] == None or lnamedfields[iname] == u''):
                 lfields[iname] = lnamedfields[iname]
@@ -519,8 +520,8 @@ if __name__ == "__main__":
     '''
     tmp = TmplOps.findTmpls(strtmp, u'не перекладено')
     tmp = tmp[0]
-    print tmp.text
+    print(tmp.text)
     for field in tmp.fields:
-        print '-'*10
-        print field.text
+        print('-'*10)
+        print(field.text)
     

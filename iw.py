@@ -40,8 +40,6 @@ docuReplacements = {
     '&params;': pagegenerators.parameterHelp,
 }
 
-#site = None # pywikibot.Site()
-
 class IwExc(Exception):
     pass
 
@@ -110,8 +108,10 @@ class IwBot(GenBot):
                             self.treat(page)
                         except KeyboardInterrupt:
                             raise KeyboardInterrupt
-                        except:
-                            self.addProblem(page.title(), u'\n\n>>> Unexpected error occured while processing page \03{blue}[[%s]]\03{default}! <<<' % page.title())
+                        except Exception as e:
+                            self.addProblem(
+                                page.title(),
+                                u'\n\n>>> Unexpected error (%s) occured while processing page \03{blue}[[%s]]\03{default}! <<<' % (e, page.title()))
             except KeyboardInterrupt:
                 raise KeyboardInterrupt
             except AttributeError: # This will actually never work
@@ -140,13 +140,13 @@ class IwBot(GenBot):
                 return
 
         self.Ntotal += 1
-        pywikibot.output(u'%d. Page [[%s]] is processed' % (self.Ntotal, page.title()))
+        pywikibot.output(u'%d. Processing page [[%s]]' % (self.Ntotal, page.title()))
         
-        iwtmpls = [u"Не перекладено",
-                   u"Нп",
-                   u"Iw",
-                   u"Нп5",
-                   u"Iw2"]
+        iwtmpls = ["Не перекладено",
+                   "Нп",
+                   "Iw",
+                   "Нп5",
+                   "Iw2"]
 
         text = page.text
         for iwtmpl in iwtmpls:
@@ -353,10 +353,10 @@ class IwBot(GenBot):
     def addProblem(self, pageTitle, message):
         if not pageTitle in self.problems.keys():
             self.problems[pageTitle] = []
-        plainmessage = re.sub(ur'\03\{[^}]*\}', ur'', message, re.UNICODE)
-        plainmessage = re.sub(ur'\n\n>>> ', ur'', plainmessage, re.UNICODE)
-        plainmessage = re.sub(ur' <<<', ur'', plainmessage, re.UNICODE)
-        plainmessage = re.sub(ur'!', ur'', plainmessage, re.UNICODE)
+        plainmessage = re.sub(r'\03\{[^}]*\}', r'', message, re.UNICODE)
+        plainmessage = re.sub(r'\n\n>>> ', r'', plainmessage, re.UNICODE)
+        plainmessage = re.sub(r' <<<', r'', plainmessage, re.UNICODE)
+        plainmessage = re.sub(r'!', r'', plainmessage, re.UNICODE)
         self.problems[pageTitle].append(plainmessage)
         pywikibot.output(message)
         self.ok = False
@@ -726,12 +726,12 @@ class ReportByTopicBot(GenBot):
             report = u'Оскільки кількість статей більше ніж удвічі перевищує %d, ця сторінка розбита на %d підсторінок:\n\n' % (NitemsPerPage, Npages)
             itemKeys = sorted(newIwItems.keys())
             itemKeysChunks = []
-            for Npage in xrange(Npages-1):
+            for Npage in range(Npages-1):
                 report += u'[[%s/%d|%d]] • ' % (pagetitle, (Npage+1), (Npage+1))
                 itemKeysChunks.append(itemKeys[Npage*NitemsPerPage:Npage*NitemsPerPage+NitemsPerPage])
             report += u'[[%s/%d|%d]]\n' % (pagetitle, Npages, Npages)
             itemKeysChunks.append(itemKeys[(Npages-1)*NitemsPerPage:])
-            for Npage in xrange(Npages):
+            for Npage in range(Npages):
                 self.iwrobot.IwItems = {}
                 for itemKey in itemKeysChunks[Npage]:
                     self.iwrobot.IwItems[itemKey] = newIwItems[itemKey]
