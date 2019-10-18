@@ -120,7 +120,6 @@ class GenBot(Bot):
 
         gen = genFactory.getCombinedGenerator()
         if not gen:
-            # pywikibot.showHelp(showHelp)
             super(GenBot, self).__init__(**options)
         else:
             preloadingGen = pagegenerators.PreloadingGenerator(gen)
@@ -698,16 +697,6 @@ class TmplOps(object):
         else:
             return lfields
 
-
-def conv2wikilink(text):
-    wikilinktext = ""
-    if text[0:5] == "Файл:":
-        wikilinktext = "[[:%s]]" % text
-    elif text[0:10] == "Категорія:":
-        wikilinktext = "[[:%s]]" % text
-    else:
-        wikilinktext = "[[%s]]" % text
-    return wikilinktext
 
 
 def dump_obj(obj, name):

@@ -17,7 +17,6 @@ Arguments:
    -report     : print only report, do not replace anything
    -maxpages:n : process at most n pages
    -notsafe    : allow Bot fail while processing a page
-   -ignwarn    : ignore warning, but ask user to accept changes
    -help       : print this help and exit
 
 &paramsgen;
@@ -29,7 +28,7 @@ Pages to work on:
 import pywikibot
 from pywikibot import pagegenerators
 import generalmodule
-from generalmodule import GenBot, wikicodes, TmplOps, conv2wikilink, dump_obj, load_obj
+from generalmodule import GenBot, wikicodes, TmplOps, dump_obj, load_obj
 
 import sys, re, time, json
 from time import gmtime, strftime
@@ -60,7 +59,6 @@ class IwBot(GenBot):
     """
 
     def __init__(self, locargs=[]):
-        """Constructor."""
         # Allowed command line arguments (in addition to global ones)
         # and their associated options with default values
         args = {
@@ -68,7 +66,6 @@ class IwBot(GenBot):
             "-report": {"report": False},
             "-maxpages": {"maxpages": "all"},
             "-notsafe": {"notsafe": False},
-            "-ignwarn": {"ignwarn": False},
             "-loadreport": {"loadreport": False},
             "-dumpreport": {"dumpreport": False},
             "-help": {"help": False},
@@ -161,9 +158,6 @@ class IwBot(GenBot):
                         text, iw, treba=analyzed[0], tekst=analyzed[1]
                     )
 
-        if self.getOption("ignwarn"):
-            self.ok = True
-
         if self.ok and self.getOption("replace"):
             summary = u"[[User:PavloChemBot/Iw|автоматична заміна]] {{[[Шаблон:Не перекладено|Не перекладено]]}} вікі-посиланнями на перекладені статті"
             self.userPut(page, page.text, text, summary=summary)
@@ -227,13 +221,8 @@ class IwBot(GenBot):
                         redirectTitle = eePage.title()
                 else:
                     self.addProblem(
-                        page, "Page [[:%s:%s]] does not exist!" % (mova, ee)
+                        page, "Не знайдено сторінки [[:%s:%s]]" % (mova, ee)
                     )
-                    if self.getOption("ignwarn"):
-                        if self.user_confirm(
-                            'Do you want to replace "%s" with wikilink?' % iw.text
-                        ):
-                            return treba, tekst
                     return
             except KeyboardInterrupt:
                 raise KeyboardInterrupt
@@ -256,13 +245,13 @@ class IwBot(GenBot):
                 if redirect:
                     self.addProblem(
                         page,
-                        "Page [[:%s:%s]] (← [[:%s:%s]]) does not have Wikidata element!"
+                        "Сторінка [[:%s:%s]] (← [[:%s:%s]]) не має елемента вікіданих"
                         % (mova, redirectTitle, mova, ee),
                     )
                 else:
                     self.addProblem(
                         page,
-                        "Page [[:%s:%s]] does not have Wikidata element!" % (mova, ee),
+                        "Page [[:%s:%s]] не має елемента вікіданих" % (mova, ee),
                     )
                 return
 
@@ -332,9 +321,6 @@ class IwBot(GenBot):
 
         # Make text substitutions for pages that translated, but first check them
         if HEREexist:
-            # if not self.getOption('replace'):
-            #    return
-
             if WikidataID == HEREWikidataID:
                 if not HEREredirect:
                     self.ok = self.ok & True
@@ -342,72 +328,9 @@ class IwBot(GenBot):
                 else:
                     self.addProblem(
                         page,
-                        "Page %s redirects to %s!"
+                        "Сторінка %s перенаправляє на %s!"
                         % (conv2wikilink(treba), conv2wikilink(HEREredirectTitle)),
                     )
-                    if self.getOption("ignwarn"):
-                        if tekst == u"":
-                            if self.user_confirm(
-                                'Do you want to replace "%s" with [[%s]]?'
-                                % (iw.text, HEREredirectTitle)
-                            ):
-                                return HEREredirectTitle, tekst
-                            if self.user_confirm(
-                                'Do you want to replace "%s" with [[%s]]?'
-                                % (
-                                    iw.text,
-                                    HEREredirectTitle[0:1].lower()
-                                    + HEREredirectTitle[1:],
-                                )
-                            ):
-                                return (
-                                    HEREredirectTitle[0:1].lower()
-                                    + HEREredirectTitle[1:],
-                                    tekst,
-                                )
-                            if self.user_confirm(
-                                'Do you want to replace "%s" with [[%s]]?'
-                                % (iw.text, treba)
-                            ):
-                                return treba, tekst
-                        elif (treba[0:1].lower() + treba[1:]) == (
-                            tekst[0:1].lower() + tekst[1:]
-                        ):
-                            if self.user_confirm(
-                                'Do you want to replace "%s" with [[%s]]?'
-                                % (iw.text, HEREredirectTitle)
-                            ):
-                                return HEREredirectTitle, HEREredirectTitle
-                            if self.user_confirm(
-                                'Do you want to replace "%s" with [[%s]]?'
-                                % (
-                                    iw.text,
-                                    HEREredirectTitle[0:1].lower()
-                                    + HEREredirectTitle[1:],
-                                )
-                            ):
-                                return (
-                                    HEREredirectTitle[0:1].lower()
-                                    + HEREredirectTitle[1:],
-                                    HEREredirectTitle[0:1].lower()
-                                    + HEREredirectTitle[1:],
-                                )
-                            if self.user_confirm(
-                                'Do you want to replace "%s" with [[%s]]?'
-                                % (iw.text, tekst)
-                            ):
-                                return tekst, tekst
-                        else:
-                            if self.user_confirm(
-                                'Do you want to replace "%s" with [[%s|%s]]?'
-                                % (iw.text, HEREredirectTitle, tekst)
-                            ):
-                                return HEREredirectTitle, tekst
-                            if self.user_confirm(
-                                'Do you want to replace "%s" with [[%s|%s]]?'
-                                % (iw.text, treba, tekst)
-                            ):
-                                return treba, tekst
             else:
                 self.addProblem(
                     page,
@@ -419,7 +342,7 @@ class IwBot(GenBot):
             if redirect:
                 self.addProblem(
                     page,
-                    "Page [[:%s:%s]] (→ [[:%s:%s]]) is translated into %s, while requested %s!"
+                    "Сторінка [[:%s:%s]] (→ [[:%s:%s]]) перекладена як %s, хоча хотіли %s"
                     % (
                         mova,
                         ee,
@@ -432,41 +355,16 @@ class IwBot(GenBot):
             else:
                 self.addProblem(
                     page,
-                    "Page [[:%s:%s]] is translated into %s, while requested %s!"
+                    "Сторінка [[:%s:%s]] перекладена як %s, хоча хотіли %s!"
                     % (mova, ee, conv2wikilink(tranlsatedInto), conv2wikilink(treba)),
                 )
-
-            if not (self.getOption("replace") and self.getOption("ignwarn")):
-                return
-
-            if tekst == "":
-                tekst = treba
-            if self.user_confirm(
-                'Do you want to replace "%s" with [[%s|%s]]?'
-                % (iw.text, tranlsatedInto, tekst)
-            ):
-                return tranlsatedInto, tekst
-            if self.user_confirm(
-                'Do you want to replace "%s" with [[%s]]?' % (iw.text, tranlsatedInto)
-            ):
-                return tranlsatedInto, tranlsatedInto
-            if self.user_confirm(
-                'Do you want to replace "%s" with [[%s]]?'
-                % (iw.text, tranlsatedInto[0:1].lower() + tranlsatedInto[1:])
-            ):
-                return (
-                    tranlsatedInto[0:1].lower() + tranlsatedInto[1:],
-                    tranlsatedInto[0:1].lower() + tranlsatedInto[1:],
-                )
-            else:
-                return
 
     def addProblem(self, page, message):
         page_title = page.title()
         if not page_title in self.problems.keys():
             self.problems[page_title] = []
         self.problems[page_title].append(message)
-        pywikibot.output("\n\n>>> " + message)
+        pywikibot.output("\t>>> " + message)
         self.ok = False
 
     def iwreplace(self, pageText, iw, treba="", tekst=""):
@@ -624,8 +522,6 @@ class IwBot(GenBot):
             )
             lPrefs = []  # List of referencies
 
-        from time import gmtime, strftime
-
         report = (
             """== Список неперекладених сторінок ==
 
@@ -696,13 +592,21 @@ class IwBot(GenBot):
         self.reportProblems = probl
         self.NproblemPages = NproblemPages
 
+def cat_config_from_page(title):
+    """Load categories config as json from ukwiki"""
+    page = pywikibot.Page(
+        pywikibot.Site("uk", "wikipedia"),
+        title + "/Категорії"
+    )
+    res = json.loads(page.text)
+    res["page"] = title
+    return res
 
 class ReportByTopicBot(GenBot):
     lpages = []
     lpagesExclude = []
 
     def __init__(self):
-        """Constructor."""
         # Allowed command line arguments (in addition to global ones)
         # and their associated options with default values
         args = {
@@ -714,7 +618,6 @@ class ReportByTopicBot(GenBot):
             "-dumpreport": {"dumpreport": False},
             "-maxpages": {"maxpages": "all"},
             "-notsafe": {"notsafe": False},
-            "-ignwarn": {"ignwarn": False},
             "-help": {"help": False},
         }
 
@@ -729,32 +632,11 @@ class ReportByTopicBot(GenBot):
             "Problems": 'Користувач:BunykBot/Сторінки з неправильно використаним шаблоном "Не перекладено"',
         }
 
-        self.topics = {}
-        site = pywikibot.Site("uk", "wikipedia")
-
-        page = pywikibot.Page(
-            site, "Вікіпедія:Проект:Біологія/Неперекладені статті/Категорії"
-        )
-        self.topics["Біологія"] = json.loads(page.text)
-        self.topics["Біологія"][
-            "page"
-        ] = "Вікіпедія:Проект:Біологія/Неперекладені статті"
-
-        page = pywikibot.Page(
-            site, "Користувач:PavloChemBot/Неперекладені сторінки/Хімія/Категорії"
-        )
-        self.topics["Хімія"] = json.loads(page.text)
-        self.topics["Хімія"][
-            "page"
-        ] = "Користувач:PavloChemBot/Неперекладені сторінки/Хімія"
-
-        page = pywikibot.Page(
-            site, "Користувач:PavloChemBot/Неперекладені сторінки/Математика/Категорії"
-        )
-        self.topics["Математика"] = json.loads(page.text)
-        self.topics["Математика"][
-            "page"
-        ] = "Користувач:PavloChemBot/Неперекладені сторінки/Математика"
+        self.topics = {
+            "Біологія": cat_config_from_page("Вікіпедія:Проект:Біологія/Неперекладені статті"),
+            "Хімія": cat_config_from_page("Користувач:PavloChemBot/Неперекладені сторінки/Хімія"),
+            "Математика": cat_config_from_page("Користувач:PavloChemBot/Неперекладені сторінки/Математика"),
+        }
 
     def run(self):
         if not self.getOption("reportbytopic"):
@@ -1035,34 +917,12 @@ class ReportByTopicBot(GenBot):
                 continue
             self.lpages.append(page.title())
 
-        """
-        sys.exit()
-        catexc = ['Категорія:Місця']
-        allcats = []
-        for catname in cats:
-            cat = pywikibot.Category(self.botsite, catname)
-            allcats.append(cat)
-            for subcat in cat.subcategories(recurse=True):
-                if subcat.title() in catexc:
-                    continue
-                allcats.append(subcat)
-        print allcats
-        
-        #robot = IwBot(locargs = ['-ref:Шаблон:Не перекладено', '-catr:Математика', '-intersect', '-report'])
-        robot = IwBot(locargs = ['-ref:Шаблон:Не перекладено', '-maxpages:2', '-report'])
-        robot.run()
-        for item in robot.IwItems:
-            for request in robot.IwItems[item]:
-                page = pywikibot.Page(self.botsite, request['inPage'])
-                for cat in page.categories():
-                    print cat.title()
-                    #print cat.subcategories()
-        """
-
+def conv2wikilink(text):
+    if text.startswith("Файл:") or text.startswith("Категорія:"):
+        text = ":" + text
+    return f"[[{text}]]"
 
 if __name__ == "__main__":
-    # IwBot(locargs = ['-cat:Вікіпедія:Статті з неактуальним шаблоном Не перекладено']).run()
-    # IwBot().run()
     # python iw.py -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено"
     # python iw.py -ref:"Шаблон:Не перекладено" -report
     # python iw.py -page:"Користувач:Pavlo Chemist/Чернетка"
