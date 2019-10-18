@@ -7,16 +7,7 @@ This bot will substitute iwtmpl {{Не перекладено}} and its aliases
 with wiki-link, if the page-to-be-translated is already translated.
 
 Arguments:
-   -reportbytopic : generate and save reports by topics
-   -loadreport    : load report dictionary from pickle file
-   -dumpreport    : dump report dictionary in pickle file
-
-                      or (but not together with above keywords)
-   
-   -replace    : replace pages [default]
-   -report     : print only report, do not replace anything
    -maxpages:n : process at most n pages
-   -notsafe    : allow Bot fail while processing a page
    -help       : print this help and exit
 
 &paramsgen;
@@ -28,31 +19,25 @@ Pages to work on:
 import pywikibot
 from pywikibot import pagegenerators
 import generalmodule
-from generalmodule import GenBot, wikicodes, TmplOps, dump_obj, load_obj
+from generalmodule import GenBot, TmplOps
+from constants import LANGUAGE_CODES
 
 import sys, re, time, json
-from time import gmtime, strftime
+from datetime import datetime
 
 docuReplacements = {
     "&paramsgen;": generalmodule.__doc__.replace("\nPages to work on:\n&params;", r""),
     "&params;": pagegenerators.parameterHelp,
 }
 
-
 class IwExc(Exception):
     pass
 
-
 class IwBot(GenBot):
     ok = True
-    IwItems = {}
     problems = {}
-    report = ""
-    Nitems = 0
-    reportProblems = ""
-    NproblemPages = 0
-    # Structure of problems:
     """
+    Structure of problems:
     problems = {'PageTitle': ['Error message 1',
                               '...next error message...'],
                         ...next problem page...}
@@ -62,12 +47,7 @@ class IwBot(GenBot):
         # Allowed command line arguments (in addition to global ones)
         # and their associated options with default values
         args = {
-            "-replace": {"replace": True},
-            "-report": {"report": False},
             "-maxpages": {"maxpages": "all"},
-            "-notsafe": {"notsafe": False},
-            "-loadreport": {"loadreport": False},
-            "-dumpreport": {"dumpreport": False},
             "-help": {"help": False},
         }
 
@@ -90,52 +70,33 @@ class IwBot(GenBot):
             pywikibot.showHelp("iw")
             sys.exit()
 
-        if self.getOption("report"):
-            self.options["replace"] = False
+        try:
+            for page in self.generator:
+                if not self.getOption("maxpages") == "all":
+                    if self.Ntotal == int(self.getOption("maxpages")):
+                        break
+                try:
+                    self.treat(page)
+                except Exception as e:
+                    self.addProblem(
+                        page,
+                        "Сталася несподівана помилка (%s) під час роботи зі сторінкою [[%s]]"
+                        % (e, page.title()),
+                    )
+        except KeyboardInterrupt:
+            pass
 
-        if self.getOption("report") and self.getOption("loadreport"):
-            self.IwItems = load_obj("IwItems")
-            self.problems = load_obj("problems")
-        else:
-            try:
-                for page in self.generator:
-                    if not self.getOption("maxpages") == "all":
-                        if self.Ntotal == int(self.getOption("maxpages")):
-                            break
-                    if self.getOption("notsafe"):
-                        self.treat(page)
-                    else:
-                        try:
-                            self.treat(page)
-                        except KeyboardInterrupt:
-                            raise KeyboardInterrupt
-                        except Exception as e:
-                            self.addProblem(
-                                page,
-                                "Unexpected error (%s) occured while processing page [[%s]]!"
-                                % (e, page.title()),
-                            )
-            except KeyboardInterrupt:
-                raise KeyboardInterrupt
-            except AttributeError:  # This will actually never work
-                pywikibot.showHelp("iw")
-                return
+        pywikibot.output("%d pages were processed" % self.Ntotal)
+        pywikibot.output("%d pages were changed" % self._save_counter)
+        pywikibot.output(
+            "%d pages were not changed" % (self.Ntotal - self._save_counter)
+        )
 
-        if self.getOption("report"):
-            pywikibot.output("%d pages were processed" % self.Ntotal)
-            self.analyzeIwItems()
-            self.analyzeProblems()
-
-            if self.getOption("dumpreport"):
-                dump_obj(self.IwItems, "IwItems")
-                dump_obj(self.problems, "problems")
-
-        elif self.getOption("replace"):
-            pywikibot.output("%d pages were processed" % self.Ntotal)
-            pywikibot.output("%d pages were changed" % self._save_counter)
-            pywikibot.output(
-                "%d pages were not changed" % (self.Ntotal - self._save_counter)
-            )
+        page = pywikibot.Page(
+            pywikibot.Site(),
+            'Користувач:BunykBot/Сторінки з неправильно використаним шаблоном "Не перекладено"'
+        )
+        self.userPut(page, page.text, self.format_problems(), summary="Автоматичне оновлення таблиць")
 
     def treat(self, page):
         self.ok = True
@@ -158,17 +119,15 @@ class IwBot(GenBot):
                         text, iw, treba=analyzed[0], tekst=analyzed[1]
                     )
 
-        if self.ok and self.getOption("replace"):
-            summary = u"[[User:PavloChemBot/Iw|автоматична заміна]] {{[[Шаблон:Не перекладено|Не перекладено]]}} вікі-посиланнями на перекладені статті"
-            self.userPut(page, page.text, text, summary=summary)
-        elif self.getOption("replace"):
+        if self.ok:
+            self.userPut(
+                page, page.text, text, summary= "[[User:PavloChemBot/Iw|автоматична заміна]] {{[[Шаблон:Не перекладено|Не перекладено]]}} вікі-посиланнями на перекладені статті"
+            )
+        else:
             pywikibot.output(
                 "Page [[%s]] was not changed because of the above problems"
                 % page.title()
             )
-            pywikibot.output("=" * 80)
-        elif not self.ok:
-            pywikibot.output("Page [[%s]] has the above problems" % page.title())
             pywikibot.output("=" * 80)
 
     def iwanalyze(self, page, pageText, iw):
@@ -178,13 +137,13 @@ class IwBot(GenBot):
         except IwExc:
             self.addProblem(
                 page,
-                "Сторінка містить шаблон {{tl|Не перекладено}} without parameters!",
+                "Сторінка містить шаблон {{tl|Не перекладено}} без параметрів",
             )
             return
 
         # Find, whether the page was translated
-        if not mova in wikicodes:
-            self.addProblem(page, 'Language code "%s" is not supported!' % mova)
+        if not mova in LANGUAGE_CODES:
+            self.addProblem(page, 'Мовний код "%s" не підтримується' % mova)
             return
 
         WikidataID = None
@@ -202,11 +161,9 @@ class IwBot(GenBot):
                 sitelinks = item.sitelinks
                 if "ukwiki" in sitelinks.keys():
                     tranlsatedInto = sitelinks["ukwiki"]
-            except KeyboardInterrupt:
-                raise KeyboardInterrupt
-            except:
+            except Exception as e: # TODO: replace by better exception
                 self.addProblem(
-                    page, "Data item [[:%s:%s]] does not exist!" % (mova, ee)
+                    page, "Data item [[:%s:%s]] does not exist" % (mova, ee)
                 )
                 return
         else:
@@ -224,11 +181,9 @@ class IwBot(GenBot):
                         page, "Не знайдено сторінки [[:%s:%s]]" % (mova, ee)
                     )
                     return
-            except KeyboardInterrupt:
-                raise KeyboardInterrupt
-            except:
+            except Exception as e:
                 self.addProblem(
-                    page, "Something is wrong with a title [[:%s:%s]]!" % (mova, ee)
+                    page, "Something is wrong with a title [[:%s:%s]]" % (mova, ee)
                 )
                 return
 
@@ -239,9 +194,7 @@ class IwBot(GenBot):
                 sitelinks = item.sitelinks
                 if "ukwiki" in sitelinks.keys():
                     tranlsatedInto = sitelinks["ukwiki"]
-            except KeyboardInterrupt:
-                raise KeyboardInterrupt
-            except:
+            except Exception as e:
                 if redirect:
                     self.addProblem(
                         page,
@@ -251,7 +204,7 @@ class IwBot(GenBot):
                 else:
                     self.addProblem(
                         page,
-                        "Page [[:%s:%s]] не має елемента вікіданих" % (mova, ee),
+                        "Сторінка [[:%s:%s]] не має елемента вікіданих" % (mova, ee),
                     )
                 return
 
@@ -270,15 +223,13 @@ class IwBot(GenBot):
                         HEREredirect = True
                         trebaPage = trebaPage.getRedirectTarget()
                         HEREredirectTitle = trebaPage.title()
-            except KeyboardInterrupt:
-                raise KeyboardInterrupt
-            except:
+            except Exception as e:
                 self.addProblem(
-                    page, "Something is wrong with a title %s!" % (conv2wikilink(treba))
+                    page, "Something is wrong with a title %s" % (conv2wikilink(treba))
                 )
                 return
         else:
-            self.addProblem(page, "Template %s does not have any page title!" % iw.text)
+            self.addProblem(page, "Template %s does not have any page title" % iw.text)
             return
 
         if HEREexist:
@@ -286,38 +237,12 @@ class IwBot(GenBot):
                 HEREitem = pywikibot.ItemPage.fromPage(trebaPage)
                 HEREitem.get()
                 HEREWikidataID = HEREitem.id
-            except KeyboardInterrupt:
-                raise KeyboardInterrupt
-            except:
+            except Exception as e:
                 self.addProblem(
                     page,
-                    "Page %s does not have Wikidata element!" % conv2wikilink(treba),
+                    "Page %s does not have Wikidata element" % conv2wikilink(treba),
                 )
                 return
-
-        # Add it to the global list
-        if not WikidataID in self.IwItems.keys():
-            self.IwItems[WikidataID] = []
-        self.IwItems[WikidataID].append(
-            {
-                "pageToTranslate": {
-                    "lang": mova,
-                    "title": ee,
-                    "redirect": redirect,
-                    "redirectTitle": redirectTitle,
-                    "translatedInto": tranlsatedInto,
-                },
-                "requiredPage": {
-                    "title": treba,
-                    "text": tekst,
-                    "exist": HEREexist,
-                    "redirect": HEREredirect,
-                    "redirectTitle": HEREredirectTitle,
-                    "WikidataID": HEREWikidataID,
-                },
-                "inPage": page.title(),
-            }
-        )
 
         # Make text substitutions for pages that translated, but first check them
         if HEREexist:
@@ -328,13 +253,13 @@ class IwBot(GenBot):
                 else:
                     self.addProblem(
                         page,
-                        "Сторінка %s перенаправляє на %s!"
+                        "Сторінка %s перенаправляє на %s"
                         % (conv2wikilink(treba), conv2wikilink(HEREredirectTitle)),
                     )
             else:
                 self.addProblem(
                     page,
-                    "Pages [[:%s:%s]] and %s link to different Wikidata items!"
+                    "Pages [[:%s:%s]] and %s link to different Wikidata items"
                     % (mova, ee, conv2wikilink(treba)),
                 )
                 return
@@ -355,7 +280,7 @@ class IwBot(GenBot):
             else:
                 self.addProblem(
                     page,
-                    "Сторінка [[:%s:%s]] перекладена як %s, хоча хотіли %s!"
+                    "Сторінка [[:%s:%s]] перекладена як %s, хоча хотіли %s"
                     % (mova, ee, conv2wikilink(tranlsatedInto), conv2wikilink(treba)),
                 )
 
@@ -409,151 +334,10 @@ class IwBot(GenBot):
 
         return treba, tekst, mova, ee
 
-    def analyzeIwItems(self):
-        report = '{| class="standard sortable"\n'
-        report += "! Вікідані || Треба перекласти || Сторінки до перекладу || Запит на переклад зі сторінок || Кількість посилань з основного простору || Кількість статей в інших розділах Вікімедіа\n"
-        Nitem = 0
-        for item in sorted(self.IwItems.keys()):
-            Nitem += 1
-            Nrequests = (
-                0
-            )  # Number of requests made with template {{iw}} in all namespaces
-            Nrefs = (
-                0
-            )  # Number of referencies to the requested treba pages in namespace 0
-            lPrefs = []  # List of referencies
-            lTreba = []
-            sTreba = ""
-            lMovaE = []
-            sMovaE = ""
-            lPages = []
-            sPages = ""
-            Nsitelinks = 0
-            translatedInto = None
-
-            for request in self.IwItems[item]:
-                Nrequests += 1
-                treba = request["requiredPage"]["title"]
-                treba = treba[0:1].lower() + treba[1:]
-                if not treba in lTreba:
-                    # Nrefs += sum(1 for _ in pywikibot.Page(self.botsite, treba).getReferences(namespaces=0,follow_redirects=False))
-                    for Pref in pywikibot.Page(self.botsite, treba).getReferences(
-                        namespaces=0, follow_redirects=False
-                    ):  # Requires more memory
-                        if not Pref in lPrefs:
-                            lPrefs.append(Pref)
-                            Nrefs += 1
-                    lTreba.append(treba)
-                    if Nrequests > 1:
-                        sTreba += "<br>"
-                    sTreba += conv2wikilink(request["requiredPage"]["title"])
-                    translatedInto = request["pageToTranslate"]["translatedInto"]
-                    if translatedInto:
-                        if item == request["requiredPage"]["WikidataID"]:
-                            sTreba += " (перекладено)"
-
-                ee = request["pageToTranslate"]["title"]
-                movaEcurrent = (
-                    request["pageToTranslate"]["lang"] + ":" + ee[0:1].lower() + ee[1:]
-                )
-                if not (movaEcurrent) in lMovaE:
-                    lMovaE.append(movaEcurrent)
-                    if Nrequests > 1:
-                        sMovaE += "<br>"
-                    sMovaE += "[[:%s:%s]]" % (
-                        request["pageToTranslate"]["lang"],
-                        request["pageToTranslate"]["title"],
-                    )
-                    if request["pageToTranslate"]["redirect"]:
-                        sMovaE += " (→ [[:%s:%s]])" % (
-                            request["pageToTranslate"]["lang"],
-                            request["pageToTranslate"]["redirectTitle"],
-                        )
-
-                    try:
-                        itemtmp = pywikibot.ItemPage.fromPage(
-                            pywikibot.Page(
-                                pywikibot.Site(
-                                    request["pageToTranslate"]["lang"], "wikipedia"
-                                ),
-                                request["pageToTranslate"]["title"],
-                            )
-                        )
-                        itemtmp.get()
-                        Nsitelinks = len(itemtmp.sitelinks.keys())
-                    except:
-                        Nsitelinks = 1
-
-                if not request["inPage"] in lPages:
-                    nTransculsions = None
-                    lPages.append(request["inPage"])
-                    if Nrequests > 1:
-                        sPages += "<br>"
-                    if request["inPage"][0:7] == "Шаблон:":
-                        nTransculsions = sum(
-                            1
-                            for _ in pywikibot.Page(
-                                self.botsite, request["inPage"]
-                            ).getReferences(
-                                onlyTemplateInclusion=True, follow_redirects=False
-                            )
-                        )
-
-                    sPages += conv2wikilink(request["inPage"])
-
-                    if request["inPage"] in self.problems.keys():
-                        sPages += "*"
-
-                    if nTransculsions:
-                        Nrequests += nTransculsions
-                        sPages += " (включень: %d)" % nTransculsions
-
-            if translatedInto and not (" (перекладено)" in sTreba):
-                sTreba += "<br>(вже є %s)" % conv2wikilink(translatedInto)
-
-            # report += '|-\n| [[d:%s]] || %s || %s || %s || %d\n' % (item, sTreba, sMovaE, sPages, Nrequests)
-            report += "|-\n| [[d:%s]] || %s || %s || %s || %d || %d\n" % (
-                item,
-                sTreba,
-                sMovaE,
-                sPages,
-                Nrefs,
-                Nsitelinks,
-            )
-            lPrefs = []  # List of referencies
-
-        report = (
-            """== Список неперекладених сторінок ==
-
-Список статей, для яких використано [[Шаблон:Не перекладено]], станом на %s. Всього таких статей %d.
-
-Позначення: 
-* Треба перекласти:
-** «(перекладено)» — вказує, що сторінка перекладена в потрібну статтю і шаблон Не перекладено можна прибрати
-** «(вже є <nowiki>[[назва статті]]</nowiki>)» — вказує, що сторінка вже можливо перекладена в потрібну статтю і шаблон Не перекладено можна прибрати
-* Сторінки до перекладу:
-** «(→ <nowiki>[[назва статті]]</nowiki>)» — показує, куди сторінку в іншомовному розділі перенаправляє
-* Запит на переклад зі сторінок:
-** «*» — сторінки відмічені мають [[#Сторінки, які можливо потребують уваги|потенційні проблеми]], тому перевірте їх
-** «(включень: n)» — кількість включень шаблонів (додається до числа в колонці «Необхідна у наступній кількості випадків»)
-
-"""
-            % (strftime("%d.%m.%Y, %H:%M:%S", gmtime()), Nitem)
-            + report
-        )
-        report += "|}"
-
-        pywikibot.output(report)
-
-        self.report = report
-        self.Nitems = Nitem
-
-    def analyzeProblems(self):
+    def format_problems(self):
         probl = '{| class="standard sortable"\n'
-        probl += "! Стаття з проблемами || Error message || N\n"
-        NproblemPages = 0
+        probl += "! Стаття з проблемами || Опис проблеми || N\n"
         for problem in sorted(self.problems.keys()):
-            NproblemPages += 1
             Nproblems = 0
             tablAppend = ""
             for prob in self.problems[problem]:
@@ -584,338 +368,9 @@ class IwBot(GenBot):
 
         probl = (
             "== Сторінки, які можливо потребують уваги ==\n\nСтаном на %s. Всього таких статей %d.\n\n%s"
-            % (strftime("%d.%m.%Y, %H:%M:%S", gmtime()), NproblemPages, probl)
+            % (datetime.now().strftime("%d.%m.%Y, %H:%M:%S"), len(self.problems), probl)
         )
-
-        pywikibot.output(probl)
-
-        self.reportProblems = probl
-        self.NproblemPages = NproblemPages
-
-def cat_config_from_page(title):
-    """Load categories config as json from ukwiki"""
-    page = pywikibot.Page(
-        pywikibot.Site("uk", "wikipedia"),
-        title + "/Категорії"
-    )
-    res = json.loads(page.text)
-    res["page"] = title
-    return res
-
-class ReportByTopicBot(GenBot):
-    lpages = []
-    lpagesExclude = []
-
-    def __init__(self):
-        # Allowed command line arguments (in addition to global ones)
-        # and their associated options with default values
-        args = {
-            "-reportbytopic": {"reportbytopic": False},
-            "-loadreport": {"loadreport": False},
-            "-dumpreport": {"dumpreport": False},
-            "-replace": {"replace": True},
-            "-report": {"report": False},
-            "-dumpreport": {"dumpreport": False},
-            "-maxpages": {"maxpages": "all"},
-            "-notsafe": {"notsafe": False},
-            "-help": {"help": False},
-        }
-
-        self.botsite = None
-        super(ReportByTopicBot, self).__init__(showHelp="iw", addargs=args)
-
-        self.generalPages = {
-            "Report": {
-                "title": "Користувач:PavloChemBot/Неперекладені сторінки",
-                "minNoRequests": 100,
-            },
-            "Problems": 'Користувач:BunykBot/Сторінки з неправильно використаним шаблоном "Не перекладено"',
-        }
-
-        self.topics = {
-            "Біологія": cat_config_from_page("Вікіпедія:Проект:Біологія/Неперекладені статті"),
-            "Хімія": cat_config_from_page("Користувач:PavloChemBot/Неперекладені сторінки/Хімія"),
-            "Математика": cat_config_from_page("Користувач:PavloChemBot/Неперекладені сторінки/Математика"),
-        }
-
-    def run(self):
-        if not self.getOption("reportbytopic"):
-            if self.getOption("report"):
-                self.iwrobot = IwBot()
-                self.iwrobot.run()
-                self.updatePages()
-            else:
-                IwBot().run()
-            return
-
-        if self.getOption("dumpreport"):
-            self.iwrobot = IwBot(
-                locargs=["-ref:Шаблон:Не перекладено", "-report", "-dumpreport"]
-            )
-            self.iwrobot.run()
-            self.updatePages()
-        elif self.getOption("loadreport"):
-            self.iwrobot = IwBot(
-                locargs=["-ref:Шаблон:Не перекладено", "-report", "-loadreport"]
-            )
-            # self.iwrobot.run()
-            self.iwrobot.IwItems = load_obj("IwItems")
-            self.iwrobot.problems = load_obj("problems")
-        else:
-            self.iwrobot = IwBot(locargs=["-ref:Шаблон:Не перекладено", "-report"])
-            self.iwrobot.run()
-            self.updatePages()
-
-        # self.topicReport('Біологія')
-        for topic in sorted(self.topics.keys()):
-            self.topicReport(topic)
-
-    def updatePages(self):
-        # self.iwrobot.analyzeIwItems()
-        report = self.iwrobot.report
-
-        tmpspl = report.split("\n")
-        lines = []
-        for line in tmpspl:
-            if "Всього таких статей" in line:
-                line += (
-                    " Показані лише найбільш поширені в інших розділах Вікімедіа (статей не менше %d)."
-                    % self.generalPages["Report"]["minNoRequests"]
-                )
-            if (
-                "[[#Сторінки, які можливо потребують уваги|потенційні проблеми]]"
-                in line
-            ):
-                line = line.replace(
-                    "#Сторінки, які можливо потребують уваги",
-                    self.generalPages["Problems"],
-                )
-            if "| [[d:" in line[: len("| [[d:")]:
-                if int(line.split()[-1]) < self.generalPages["Report"]["minNoRequests"]:
-                    del lines[-1]
-                    continue
-            lines.append(line)
-
-        report = "== Не перекладені сторінки за темами ==\n"
-        for topic in sorted(self.topics.keys()):
-            report += "* [[%s|%s]]\n" % (self.topics[topic]["page"], topic)
-        report += "\n"
-
-        for line in lines:
-            report += line + "\n"
-
-        # self.iwrobot.analyzeProblems()
-        reportProblems = self.iwrobot.reportProblems
-
-        # Put reports:
-        summary = "[[User:PavloChemBot/Iw|автоматичне оновлення]] таблиць"
-        page = pywikibot.Page(self.botsite, self.generalPages["Report"]["title"])
-        self.userPut(page, page.text, report, summary=summary)
-        page = pywikibot.Page(self.botsite, self.generalPages["Problems"])
-        self.userPut(page, page.text, reportProblems, summary=summary)
-
-    def topicReport(self, topic):
-        start = time.time()
-
-        # Prepare list of topic pages
-        cats = self.topics[topic]["cats"]
-        catexc = self.topics[topic]["catexc"]
-        pagetitle = self.topics[topic]["page"]
-
-        # Get all pages transcluding {{iw}} template
-        locargscat = ["-ref:Шаблон:Не перекладено"]
-        findBot = GenBot(showHelp="iw", locargs=locargscat)
-        alliwpages = [page.title() for page in findBot.generator]
-        pywikibot.output(
-            "Finished getting all pages transcluding iw template after %.1f seconds"
-            % (time.time() - start)
-        )
-
-        # Get all categories in the topic
-        lcats = []
-        catText = ""
-        for cat in cats:
-            catText += "* [[:Категорія:%s]] (%d)\n" % (cat["title"], cat["depth"])
-            lcats += [cat["title"]]
-            if cat["depth"] > 0:
-                pywikicat = pywikibot.Category(self.botsite, cat["title"])
-                lcats += [
-                    subcat.title()
-                    for subcat in pywikicat.subcategories(recurse=cat["depth"])
-                ]
-        pywikibot.output(
-            "Finished collecting categories to include into the topic topic after %.1f seconds"
-            % (time.time() - start)
-        )
-
-        # Get all categories that should be excluded from the topic
-        lcatsExclude = []
-        catexcText = ""
-        for cat in catexc:
-            catexcText += "* [[:Категорія:%s]] (%d)\n" % (cat["title"], cat["depth"])
-            lcatsExclude += [cat["title"]]
-            if cat["depth"] > 0:
-                pywikicat = pywikibot.Category(self.botsite, cat["title"])
-                lcatsExclude += [
-                    subcat.title()
-                    for subcat in pywikicat.subcategories(recurse=cat["depth"])
-                ]
-        pywikibot.output(
-            "Finished collecting categories to exclude from the topic after %.1f seconds"
-            % (time.time() - start)
-        )
-
-        # Get all required categories
-        lcatsreduced = [cat for cat in lcats if not cat in lcatsExclude]
-        pywikibot.output(
-            "Finished collecting all required categories after %.1f seconds"
-            % (time.time() - start)
-        )
-
-        # Get all pages in the topic
-        locargscat = []
-        for catname in lcatsreduced:
-            locargscat.append("-cat:%s" % catname)
-        findBot = GenBot(showHelp="iw", locargs=locargscat)
-        self.lpages = []
-        for page in findBot.generator:
-            if page.title() in alliwpages:
-                self.lpages.append(page.title())
-        pywikibot.output(
-            "Finished collecting pages in the topic after %.1f seconds"
-            % (time.time() - start)
-        )
-
-        """
-        self.lpages = []
-        self.lpagesExclude = []
-        catexcText = ''
-        for cate in catexc:
-            catexcText += '* [[:Категорія:%s]] (%d)\n' % (cate['title'], cate['depth'])
-            self.findPages(cate['title'], cate['depth'])
-        self.lpagesExclude = self.lpages[:]
-        pywikibot.output('Finished collecting pages to exclude from topic after %.1f seconds' % (time.time() - start))
-
-        self.lpages = []
-        catText = ''
-        for cat in cats:
-            catText += '* [[:Категорія:%s]] (%d)\n' % (cat['title'], cat['depth'])
-            self.findPages(cat['title'], cat['depth'])
-        self.lpagesExclude = []
-        pywikibot.output('Finished collecting pages to include into topic topic after %.1f seconds' % (time.time() - start))
-        """
-
-        header = """На цій сторінці зібрані неперекладені статті з теми «%s».
-
-Сторінка автоматично оновлюється ботом на основі пошуку в наступних категоріях (глибина рекурсивного пошуку в дужках):
-%s
-за виключенням таких категорій (глибина рекурсивного пошуку в дужках):
-{{стовпці|3}}
-%s</div>""" % (
-            topic,
-            catText,
-            catexcText,
-        )
-
-        pywikibot.output(header)
-
-        # Prepare list of not translated pages
-        oldIwItems = self.iwrobot.IwItems
-        newIwItems = {}
-        for item in oldIwItems.keys():
-            for request in oldIwItems[item]:
-                page = request["inPage"]
-                if page in self.lpages:
-                    if not item in newIwItems:
-                        newIwItems[item] = []
-                    newIwItems[item].append(request)
-        NitemsPerPage = 2000
-        Npages = len(newIwItems) / NitemsPerPage
-        if Npages > 1:
-            report = (
-                "Оскільки кількість статей більше ніж удвічі перевищує %d, ця сторінка розбита на %d підсторінок:\n\n"
-                % (NitemsPerPage, Npages)
-            )
-            itemKeys = sorted(newIwItems.keys())
-            itemKeysChunks = []
-            for Npage in range(Npages - 1):
-                report += "[[%s/%d|%d]] • " % (pagetitle, (Npage + 1), (Npage + 1))
-                itemKeysChunks.append(
-                    itemKeys[
-                        Npage * NitemsPerPage : Npage * NitemsPerPage + NitemsPerPage
-                    ]
-                )
-            report += "[[%s/%d|%d]]\n" % (pagetitle, Npages, Npages)
-            itemKeysChunks.append(itemKeys[(Npages - 1) * NitemsPerPage :])
-            for Npage in range(Npages):
-                self.iwrobot.IwItems = {}
-                for itemKey in itemKeysChunks[Npage]:
-                    self.iwrobot.IwItems[itemKey] = newIwItems[itemKey]
-                self.iwrobot.analyzeIwItems()
-                reportPage = self.iwrobot.report
-                page = pywikibot.Page(self.botsite, pagetitle + "/%d" % (Npage + 1))
-                summary = "[[User:PavloChemBot/Iw|автоматичне оновлення]] таблиць"
-                self.userPut(page, page.text, reportPage, summary=summary)
-            self.iwrobot.IwItems = oldIwItems
-        else:
-            self.iwrobot.IwItems = newIwItems
-            self.iwrobot.analyzeIwItems()
-            report = self.iwrobot.report
-            self.iwrobot.IwItems = oldIwItems
-        pywikibot.output(
-            "Finished preparing list of not translated pages after %.1f seconds"
-            % (time.time() - start)
-        )
-
-        # Prepare list of problems
-        oldProblems = self.iwrobot.problems
-        newProblems = {}
-        for page in oldProblems.keys():
-            if page in self.lpages:
-                if not page in newProblems:
-                    newProblems[page] = []
-                newProblems[page] = oldProblems[page]
-        self.iwrobot.problems = newProblems
-        self.iwrobot.analyzeProblems()
-        reportProblems = self.iwrobot.reportProblems
-        self.iwrobot.problems = oldProblems
-        self.lpages = []
-        lcatsreduced = []
-        lcats = []
-        lcatsExclude = []
-        pywikibot.output(
-            "Finished preparing list of problems after %.1f seconds"
-            % (time.time() - start)
-        )
-
-        # Put reports:
-        page = pywikibot.Page(self.botsite, pagetitle)
-        text = header + "\n" + report + "\n\n" + reportProblems
-        summary = "[[User:PavloChemBot/Iw|автоматичне оновлення]] таблиць"
-        self.userPut(page, page.text, text, summary=summary)
-        pywikibot.output(
-            "Finished putting report after %.1f seconds" % (time.time() - start)
-        )
-
-    def findPages(self, catname, catrdepth):
-        if catrdepth == "infinite":
-            locargscat = [
-                "-ref:Шаблон:Не перекладено",
-                "-catr:%s" % catname,
-                "-intersect",
-            ]
-        else:
-            locargscat = [
-                "-ref:Шаблон:Не перекладено",
-                "-catr:%s" % catname,
-                "-intersect",
-                "-catrdepth:%d" % catrdepth,
-            ]
-        findBot = GenBot(showHelp="iw", locargs=locargscat)
-        for page in findBot.generator:
-            if page.title() in self.lpagesExclude or page.title() in self.lpages:
-                continue
-            self.lpages.append(page.title())
+        return probl
 
 def conv2wikilink(text):
     if text.startswith("Файл:") or text.startswith("Категорія:"):
@@ -923,12 +378,10 @@ def conv2wikilink(text):
     return f"[[{text}]]"
 
 if __name__ == "__main__":
-    # python iw.py -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено"
-    # python iw.py -ref:"Шаблон:Не перекладено" -report
-    # python iw.py -page:"Користувач:Pavlo Chemist/Чернетка"
-
     # Run with report:
-    # python3.6 iw.py -maxpages:200 -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено" -dumpreport -report -always
+    # python3.6 iw.py -maxpages:200 -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено" -always
+    # python3.6 iw.py -maxpages:200 -ns:10 -ref:"Шаблон:Не перекладено" -always
+    # python3.6 iw.py -page:"Користувач:Pavlo Chemist/Чернетка"
 
-    robot = ReportByTopicBot()
+    robot = IwBot()
     robot.run()
