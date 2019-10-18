@@ -16,22 +16,27 @@ Pages to work on:
 &params;
 """
 
+import sys, re, json
+from time import time
+from datetime import datetime
+
 import pywikibot
 from pywikibot import pagegenerators
+
 import generalmodule
 from generalmodule import GenBot, TmplOps
 from constants import LANGUAGE_CODES
 
-import sys, re, time, json
-from datetime import datetime
 
 docuReplacements = {
     "&paramsgen;": generalmodule.__doc__.replace("\nPages to work on:\n&params;", r""),
     "&params;": pagegenerators.parameterHelp,
 }
 
+
 class IwExc(Exception):
     pass
+
 
 class IwBot(GenBot):
     ok = True
@@ -46,10 +51,7 @@ class IwBot(GenBot):
     def __init__(self, locargs=[]):
         # Allowed command line arguments (in addition to global ones)
         # and their associated options with default values
-        args = {
-            "-maxpages": {"maxpages": "all"},
-            "-help": {"help": False},
-        }
+        args = {"-maxpages": {"maxpages": "all"}, "-help": {"help": False}}
 
         self.botsite = None
         super(IwBot, self).__init__(showHelp="iw", addargs=args, locargs=locargs)
@@ -70,6 +72,8 @@ class IwBot(GenBot):
             pywikibot.showHelp("iw")
             sys.exit()
 
+        start = time()
+
         try:
             for page in self.generator:
                 if not self.getOption("maxpages") == "all":
@@ -86,17 +90,21 @@ class IwBot(GenBot):
         except KeyboardInterrupt:
             pass
 
-        pywikibot.output("%d pages were processed" % self.Ntotal)
-        pywikibot.output("%d pages were changed" % self._save_counter)
-        pywikibot.output(
-            "%d pages were not changed" % (self.Ntotal - self._save_counter)
-        )
-
         page = pywikibot.Page(
             pywikibot.Site(),
-            'Користувач:BunykBot/Сторінки з неправильно використаним шаблоном "Не перекладено"'
+            'Користувач:BunykBot/Сторінки з неправильно використаним шаблоном "Не перекладено"',
         )
-        self.userPut(page, page.text, self.format_problems(), summary="Автоматичне оновлення таблиць")
+        self.userPut(
+            page,
+            page.text,
+            self.format_problems(),
+            summary="Автоматичне оновлення таблиць",
+        )
+
+        print("%d pages were processed" % self.Ntotal)
+        print("%d pages were changed" % self._save_counter)
+        print("%d pages were not changed" % (self.Ntotal - self._save_counter))
+        print("Finished in %s seconds" % int(time() - start))
 
     def treat(self, page):
         self.ok = True
@@ -121,7 +129,10 @@ class IwBot(GenBot):
 
         if self.ok:
             self.userPut(
-                page, page.text, text, summary= "[[User:PavloChemBot/Iw|автоматична заміна]] {{[[Шаблон:Не перекладено|Не перекладено]]}} вікі-посиланнями на перекладені статті"
+                page,
+                page.text,
+                text,
+                summary="[[User:PavloChemBot/Iw|автоматична заміна]] {{[[Шаблон:Не перекладено|Не перекладено]]}} вікі-посиланнями на перекладені статті",
             )
         else:
             pywikibot.output(
@@ -136,8 +147,7 @@ class IwBot(GenBot):
             treba, tekst, mova, ee = self.getFields(pageText, iw)
         except IwExc:
             self.addProblem(
-                page,
-                "Сторінка містить шаблон {{tl|Не перекладено}} без параметрів",
+                page, "Сторінка містить шаблон {{tl|Не перекладено}} без параметрів"
             )
             return
 
@@ -161,7 +171,7 @@ class IwBot(GenBot):
                 sitelinks = item.sitelinks
                 if "ukwiki" in sitelinks.keys():
                     tranlsatedInto = sitelinks["ukwiki"]
-            except Exception as e: # TODO: replace by better exception
+            except Exception as e:  # TODO: replace by better exception
                 self.addProblem(
                     page, "Data item [[:%s:%s]] does not exist" % (mova, ee)
                 )
@@ -294,19 +304,19 @@ class IwBot(GenBot):
 
     def iwreplace(self, pageText, iw, treba="", tekst=""):
         if tekst == "":
-            pageText = pageText[: iw.start] + u"[[" + treba + u"]]" + pageText[iw.end :]
+            pageText = pageText[: iw.start] + "[[" + treba + "]]" + pageText[iw.end :]
         elif (treba[0:1].lower() + treba[1:]) == (
             tekst[0:1].lower() + tekst[1:]
         ):  # for cases like {{Не перекладено|Марковська модель|марковська модель||Markov model}}
-            pageText = pageText[: iw.start] + u"[[" + tekst + u"]]" + pageText[iw.end :]
+            pageText = pageText[: iw.start] + "[[" + tekst + "]]" + pageText[iw.end :]
         else:
             pageText = (
                 pageText[: iw.start]
-                + u"[["
+                + "[["
                 + treba
-                + u"|"
+                + "|"
                 + tekst
-                + u"]]"
+                + "]]"
                 + pageText[iw.end :]
             )
 
@@ -372,10 +382,12 @@ class IwBot(GenBot):
         )
         return probl
 
+
 def conv2wikilink(text):
     if text.startswith("Файл:") or text.startswith("Категорія:"):
         text = ":" + text
     return f"[[{text}]]"
+
 
 if __name__ == "__main__":
     # Run with report:
