@@ -39,7 +39,6 @@ class IwExc(Exception):
 
 
 class IwBot(GenBot):
-    ok = True
     problems = {}
     """
     Structure of problems:
@@ -64,8 +63,8 @@ class IwBot(GenBot):
             "Шаблон:Не перекладено",
             "Вікіпедія:Завдання для роботів",
             "Вікіпедія:Проект:Біологія/Неперекладені статті",
-            "Вікіпедія:WikiPhysContest-2016",
         ]
+        self.wiki_cache = WikiCache()
 
     def run(self):
         if self.getOption("help"):
@@ -107,12 +106,11 @@ class IwBot(GenBot):
         print("Finished in %s seconds" % int(time() - start))
 
     def treat(self, page):
-        self.ok = True
-
         for exc in self.titleExceptions:
-            if exc in page.title():
+            if page.title().startswith(exc):
                 return
 
+        self.ok = True
         self.Ntotal += 1
         pywikibot.output("%d. Processing page [[%s]]" % (self.Ntotal, page.title()))
 
@@ -162,18 +160,10 @@ class IwBot(GenBot):
         tranlsatedInto = None
         if mova == "d":
             try:
-                site = pywikibot.Site("wikidata", "wikidata")
-                repo = site.data_repository()
-                item = pywikibot.ItemPage(repo, ee)
-                item.get()
-                WikidataID = item.id
-                pywikibot.output("itom.id = %s" % WikidataID)
-                sitelinks = item.sitelinks
-                if "ukwiki" in sitelinks.keys():
-                    tranlsatedInto = sitelinks["ukwiki"]
+                WikidataID, tranlsatedInto = self.wiki_cache.get_iw_data()
             except Exception as e:  # TODO: replace by better exception
                 self.addProblem(
-                    page, "Data item [[:%s:%s]] does not exist" % (mova, ee)
+                    page, "Сторінка [[:%s:%s]] не має елемента вікіданих" % (mova, ee)
                 )
                 return
         else:
@@ -387,6 +377,53 @@ def conv2wikilink(text):
     if text.startswith("Файл:") or text.startswith("Категорія:"):
         text = ":" + text
     return f"[[{text}]]"
+
+class WikiCache:
+    """Cache requests to wiki to avoid repeated requests"""
+
+    def __init__(self):
+        self.sites = dict(
+            d=pywikibot.Site("wikidata", "wikidata")
+        )
+        self.cache = dict()
+
+    def get_site(self, lang):
+        """Get site by language"""
+        if lang not in self.sites:
+            self.sites[lang] = pywikibot.Site(lang, "wikipedia")
+        return self.sites[lang]
+
+    def get_iw_data(self, lang, page_title):
+        """Get interwiki data"""
+        if (lang, page_title) in self.cache:
+            return self.cache[(lang, page_title)]
+
+        data = self._fetch_iw_data(lang, page_title)
+        self.cache[(lang, page_title)] = data
+        return data
+
+    def _fetch_iw_data(self, lang, page_title):
+        """Do actual request to wiki to fetch interwiki data"""
+        site = self.get_site(lang)
+
+        WikidataID = None
+        redirect = False
+        redirectTitle = None
+        tranlsatedInto = None
+
+        if lang == "d":
+            repo = site.data_repository()
+            item = pywikibot.ItemPage(repo, page_title)
+            item.get()
+            WikidataID = item.id
+            pywikibot.output("item.id = %s" % WikidataID)
+            sitelinks = item.sitelinks
+            if "ukwiki" in sitelinks.keys():
+                tranlsatedInto = sitelinks["ukwiki"]
+        else:
+            pass # TODO:
+
+        return WikidataID, tranlsatedInto
 
 
 if __name__ == "__main__":

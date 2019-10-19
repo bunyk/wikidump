@@ -21,17 +21,11 @@ import sys, re
 
 from constants import LANGUAGE_CODES
 
-docuReplacements = {"&params;": pagegenerators.parameterHelp}
-
-
 class GenBot(Bot):
     """
     Generic Bot
     """
 
-    Ntotal = 0
-    Nchangedpages = 0
-    Nnotchanged = 0
     all_args = []
 
     def __init__(self, showHelp="generalmodule", addargs={}, locargs=[]):
@@ -131,46 +125,6 @@ class GenBot(Bot):
         raise NotImplementedError(
             "Method %s.run() not implemented." % self.__class__.__name__
         )
-
-    @classmethod
-    def findInterwiki(cls, page):
-        iwikis = {}
-        for iwiki in re.finditer(
-            "\[\[(?P<lang>[a-z-]+)\:(?P<title>[^]]+)\]\]",
-            page.text,
-            flags=re.UNICODE | re.MULTILINE | re.DOTALL | re.IGNORECASE,
-        ):
-            lang = iwiki.group("lang")
-            if lang in LANGUAGE_CODES:
-                iwikis[lang] = iwiki.group("title")
-        return iwikis
-
-    @classmethod
-    def setSitelink(item, sitename, title, summary):
-        global args
-
-        # https://www.mediawiki.org/wiki/Manual:Pywikibot/Wikidata
-
-        if sitename in item.sitelinks.keys():
-            if item.sitelinks[sitename] == title:
-                pywikibot.output(
-                    'Wikidata item ID (%s) already has a link "%s" to %s'
-                    % (item.id, title, sitename)
-                )
-            else:
-                pywikibot.output(
-                    'You try to set link "%s" to %s for Wikidata item ID (%s) that already has a link "%s"'
-                    % (title, sitename, item.id, item.sitelinks[sitename])
-                )
-            return
-
-        if self.user_confirm(
-            "Do you want to set link %s:%s to the Wikidata?" % (sitename, title)
-        ):
-            if item:
-                item.setSitelink(
-                    sitelink={"site": sitename, "title": title}, summary=summary
-                )
 
 
 class TmplError(Exception):
