@@ -26,7 +26,7 @@ LANGUAGE_CODES = set([
     "cs",
     "sr",
     "ko",
-    "h",
+    "hu",
     "ms",
     "tr",
     "min",
@@ -289,5 +289,6 @@ LANGUAGE_CODES = set([
     "kr",
     "be-tarask",
     "cs",
+    "cz",
     "d",
 ])  # Aliases and Wikidata
