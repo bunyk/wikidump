@@ -9,3 +9,4 @@ user-config.py
 pywikibot.lwp
 apicache-py3/
 throttle.ctrl
+cache.json

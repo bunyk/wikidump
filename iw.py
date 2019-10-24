@@ -12,341 +12,219 @@ Arguments:
 """
 
 import sys, re, json
-from datetime import datetime
+from datetime import datetime, timedelta
 import traceback
 from typing import List, Dict
 
 import pywikibot
 from pywikibot import pagegenerators, Bot
+import mwparserfromhell
 
 from generalmodule import TmplOps
 from constants import LANGUAGE_CODES
 
+IWTMPLS = ["Не перекладено", "Нп", "Iw", "Нп5", "Iw2"]
+TITLE_EXCEPTIONS = [
+    "Користувач:",
+    "Вікіпедія:Кнайпа",
+    "Обговорення:",
+    "Обговорення користувача:",
+    "Шаблон:Не перекладено",
+    "Вікіпедія:Завдання для роботів",
+    "Вікіпедія:Проект:Біологія/Неперекладені статті",
+]
+
+REPLACE_SUMMARY = "[[User:PavloChemBot/Iw|автоматична заміна]] {{[[Шаблон:Не перекладено|Не перекладено]]}} вікі-посиланнями на перекладені статті"
+TIME_FORMAT = "%d.%m.%Y, %H:%M:%S"
 
 class IwExc(Exception):
-    def __init__(self, message): 
+    def __init__(self, message):
         self.message = message
 
-class IwBot(Bot):
-    problems: Dict[str, List[str]] = {}
-    all_args = []
 
-    def __init__(self, locargs=[]):
-        # Allowed command line arguments (in addition to global ones)
-        # and their associated options with default values
-        addargs = {"-maxpages": {"maxpages": "all"}}
 
-        # Allow additional options
-        addargs["-catrdepth"] = {"catrdepth": "infinite"}
-        for key in addargs.keys():
-            arg = addargs[key]
-            k, v = list(arg.items())[0]
-            self.availableOptions.update({k: v})
+def conv2wikilink(text):
+    if text.startswith("Файл:") or text.startswith("Категорія:"):
+        text = ":" + text
+    return f"[[{text}]]"
 
-        self.botsite = None
-        pywikibot._sites = {}
-        # Read commandline arguments.
-        self.all_args = pywikibot.handle_args(locargs)
-        # Now we can create site object
-        self.botsite = pywikibot.Site()
 
-        # Get pages defined by global parameters
-        # and parse options from the dictionary of command line arguments
-        genFactory = pagegenerators.GeneratorFactory()
-        options = {}
-        options["catrdepth"] = "infinite"
-        catrargs = []
-        for arg in self.all_args:
-            if arg.startswith("-catrdepth"):
-                options["catrdepth"] = arg.split(":")[1]
-            elif arg.startswith("-catr"):
-                catrargs.append(arg)
-                continue
-            elif genFactory.handleArg(arg):
-                continue
-            elif arg == "-always":
-                options["always"] = True
-            elif not arg.split(":")[0] in addargs.keys():
-                pywikibot.output('Option "%s" is not supported' % arg)
-                pywikibot.showHelp(showHelp)
-                sys.exit()
-            else:
-                splarg = arg.split(":")
-                argcmd = splarg[0]
-                optname = list(addargs[argcmd].keys())[0]
-                if len(splarg) == 1:
-                    options[optname] = True
-                elif len(splarg) == 2:
-                    argvalue = splarg[1]
-                    options[optname] = argvalue
-                elif len(splarg) > 2:
-                    splreg = re.search(
-                        r"(?P<argcmd>.*?)\:(?P<argvalue>.*)",
-                        arg,
-                        flags=re.UNICODE | re.MULTILINE | re.DOTALL | re.IGNORECASE,
-                    )
-                    if splreg:
-                        options[optname] = splreg.group("argvalue")
+class WikiCache:
+    """Cache requests to wiki to avoid repeated requests"""
 
-        old = False  # On non-updated Windows machine, where -cat and -catr work
-        if old:
-            recurse = True
-            if not options["catrdepth"] == "infinite":
-                recurse = int(options["catrdepth"])
-            for arg in catrargs:
-                gen = genFactory.getCategoryGen(
-                    arg,
-                    recurse=recurse,
-                    gen_func=pagegenerators.CategorizedPageGenerator,
-                )
-                if gen:
-                    genFactory.gens.append(gen)
-        else:
-            for arg in catrargs:
-                recurse = False
-                catname = ""
-                if arg.startswith("-catr:"):
-                    recurse = True
-                    if not options["catrdepth"] == "infinite":
-                        recurse = int(options["catrdepth"])
-                    catname = arg[len("-catr:") :]
-                elif arg.startswith("-cat:"):
-                    catname = arg[len("-cat:") :]
-                gen = genFactory.getCategoryGen(
-                    catname,
-                    recurse=recurse,
-                    gen_func=pagegenerators.CategorizedPageGenerator,
-                )
-                if gen:
-                    genFactory.gens.append(gen)
+    def __init__(self, filename='cache.json'):
+        self.sites = dict(d=pywikibot.Site("wikidata", "wikidata"))
+        self.filename = filename
+        try:
+            with open(filename) as f:
+                self.cache = json.load(f)
+        except FileNotFoundError:
+            self.cache = dict() # we will save it later
 
-        gen = genFactory.getCombinedGenerator()
-        if not gen:
-            super(IwBot, self).__init__(**options)
-        else:
-            preloadingGen = pagegenerators.PreloadingGenerator(gen)
-            super(IwBot, self).__init__(generator=preloadingGen, **options)
+    def save(self):
+        try:
+            with open(self.filename, 'w', encoding='utf8') as f:
+                json.dump(self.cache, f, indent=' ', ensure_ascii=False)
+        except Exception as e:
+            import bpython; bpython.embed(locals())
 
-        self.titleExceptions = [
-            "Користувач:",
-            "Вікіпедія:Кнайпа",
-            "Обговорення:",
-            "Обговорення користувача:",
-            "Шаблон:Не перекладено",
-            "Вікіпедія:Завдання для роботів",
-            "Вікіпедія:Проект:Біологія/Неперекладені статті",
-        ]
-        self.wiki_cache = WikiCache()
+    def get_site(self, lang):
+        """Get site by language"""
+        if lang not in self.sites:
+            self.sites[lang] = pywikibot.Site(lang, "wikipedia")
+        return self.sites[lang]
 
-    def run(self):
-        self.Ntotal = 0
+    def get_page_and_wikidata(self, lang, title):
+        key = lang + ':' + title
+        if (
+            (key in self.cache) and
+            (datetime.strptime(
+                self.cache[key]['till'],
+                TIME_FORMAT
+            ) >= datetime.now())
+        ):
+            return self.cache[key]['val']
 
-        self.start = datetime.now()
+        res = self._fetch_page_and_wikidata(lang, title)
+        self.cache[key] = dict(
+            val=res,
+            till=(datetime.now() + timedelta(days=7 if res[0] else 1)).strftime(TIME_FORMAT)
+        )
+        return res
+
+    def _fetch_page_and_wikidata(self, lang, title):
+        print('fetching', lang, title)
+        page = pywikibot.Page(self.get_site(lang), title)
+        exists = page.exists()
+        if not exists:
+            return False, None, None, {}
+
+        redirect = None
+        if page.isRedirectPage():
+            page = page.getRedirectTarget()
+            redirect = page.title()
 
         try:
-            for page in self.generator:
-                if not self.getOption("maxpages") == "all":
-                    if self.Ntotal == int(self.getOption("maxpages")):
-                        break
-                try:
-                    self.treat(page)
-                except Exception as e:
-                    traceback.print_exc()
-                    self.addProblem(
-                        page,
-                        "Сталася несподівана помилка (%s) під час роботи зі сторінкою [[%s]]"
-                        % (e, page.title()),
-                    )
+            item = pywikibot.ItemPage.fromPage(page)
+            wikidata_id = item.id
+            uk_version = item.sitelinks.get('ukwiki')
+        except pywikibot.exceptions.NoPage:
+            wikidata_id, uk_version = None, None
+
+        return exists, redirect, wikidata_id, uk_version
+
+class IwBot2:
+    problems: Dict[str, List[str]] = {}
+
+    def __init__(self, method):
+        self.method = method
+        self.wiki_cache = WikiCache()
+
+    def run(self, time_limit=None):
+        self.start = datetime.now()
+        if self.method == "category":
+            cat = pywikibot.Category(
+                pywikibot.Site(),
+                "Категорія:Вікіпедія:Статті з неактуальним шаблоном Не перекладено",
+            )
+            generator = cat.articles()
+
+        try:
+            for n, page in enumerate(generator, 1):
+                duration = (datetime.now() - self.start).seconds
+                print(f"{n}. ({duration}s) Processing [[{page.title()}]]")
+                self.process(page)
+                if time_limit and duration >= time_limit:
+                    break
         except KeyboardInterrupt:
             pass
+
+        self.wiki_cache.save()
 
         page = pywikibot.Page(
             pywikibot.Site(),
             'Користувач:BunykBot/Сторінки з неправильно використаним шаблоном "Не перекладено"',
         )
-        self.userPut(
-            page,
-            page.text,
-            self.format_problems(),
-            summary="Автоматичне оновлення таблиць",
-        )
+        update_page(page, self.format_problems(), 'Автоматичне оновлення таблиць')
 
-        print("%d pages were processed" % self.Ntotal)
-        print("%d pages were changed" % self._save_counter)
-        print("%d pages were not changed" % (self.Ntotal - self._save_counter))
+        print("%d pages were processed" % n)
         print("Finished in %s seconds" % (datetime.now() - self.start).seconds)
 
-    def treat(self, page):
-        for exc in self.titleExceptions:
+    def process(self, page):
+        """Process page to remove unnecessary iw templates"""
+        for exc in TITLE_EXCEPTIONS:
             if page.title().startswith(exc):
                 return
-
-        self.ok = True
-        self.Ntotal += 1
-        print("%d. Processing page [[%s]]" % (self.Ntotal, page.title()))
-
-        iwtmpls = ["Не перекладено", "Нп", "Iw", "Нп5", "Iw2"]
-
-        text = page.text
-        for iwtmpl in iwtmpls:
-            for iw in reversed(TmplOps.findTmpls(text, iwtmpl)):
-                analyzed = self.iwanalyze(page, text, iw)
-                if analyzed:
-                    text = self.iwreplace(
-                        text, iw, treba=analyzed[0], tekst=analyzed[1]
-                    )
-
-        if self.ok:
-            self.userPut(
-                page,
-                page.text,
-                text,
-                summary="[[User:PavloChemBot/Iw|автоматична заміна]] {{[[Шаблон:Не перекладено|Не перекладено]]}} вікі-посиланнями на перекладені статті",
-            )
-        else:
-            print(
-                "Page [[%s]] was not changed because of the above problems"
-                % page.title()
-            )
-            print("=" * 80)
-
-    def iwanalyze(self, page, pageText, iw):
-        # Extract all fields
-        try:
-            treba, tekst, mova, ee = self.getFields(pageText, iw)
-        except IwExc as e:
-            self.addProblem(page, e.message)
-            return
-        # print('{{iw|' + '|'.join([treba, tekst, mova, ee]) + '}}')
-
-        # Find, whether the page was translated
-        if not mova in LANGUAGE_CODES:
-            self.addProblem(page, 'Мовний код "%s" не підтримується' % mova)
-            return
-
-        try:
-            WikidataID, redirect, redirectTitle, tranlsatedInto = self.wiki_cache.get_iw_data(mova, ee)
-        except IwExc as e:
-            self.addProblem(page, e.message)
-            return
-
-        if not treba:
-            self.addProblem(page, "Шаблон %s не має параметра з назвою сторінки" % iw.text)
-            return
-        # Now check, whether page with title needed already exists
-        HEREexist = False
-        HEREredirect = False
-        HEREredirectTitle = None
-        HEREWikidataID = None
-        trebaPage = self.wiki_cache.get_page("uk", treba)
-
-        if trebaPage.exists():
-            HEREexist = True
-            if trebaPage.isRedirectPage():
-                HEREredirect = True
-                trebaPage = trebaPage.getRedirectTarget()
-                HEREredirectTitle = trebaPage.title()
-
-        if HEREexist:
+        new_text = page.text
+        code = mwparserfromhell.parse(new_text)
+        for tmpl in code.filter_templates():
+            if not is_iw_tmpl(tmpl.name):
+                continue
+            replacement = False
             try:
-                HEREitem = pywikibot.ItemPage.fromPage(trebaPage)
-                HEREitem.get()
-                HEREWikidataID = HEREitem.id
+                replacement = self.find_replacement(tmpl)
+            except IwExc as e:
+                self.add_problem(page, e.message)
             except Exception as e:
-                self.addProblem(
-                    page,
-                    "Page %s does not have Wikidata element" % conv2wikilink(treba),
-                )
-                return
+                self.add_problem(page, "Неочікувана помилка (%s) при роботі з шаблоном %s" % (e, tmpl))
 
-        # Make text substitutions for pages that translated, but first check them
-        if HEREexist:
-            if WikidataID == HEREWikidataID:
-                if not HEREredirect:
-                    return treba, tekst
+            if replacement:
+                new_text.replace(str(tmpl), replacement)
+        update_page(page, new_text, REPLACE_SUMMARY)
+
+    def find_replacement(self, tmpl):
+        """Return string to which template should be replaced, if it should
+        Return None or other falsy value otherwise.
+        """
+        uk_title, text, lang, external_title = get_params(tmpl)
+
+        if text.startswith(uk_title): # TODO: maybe do this shortening as a separate step
+            replacement = f'[[{uk_title}]]{text[len(uk_title):]}'
+        else:
+            replacement = f'[[{uk_title}|{text}]]'
+
+        if not lang in LANGUAGE_CODES:
+            raise IwExc('Мовний код "%s" не підтримується' % mova)
+        if not uk_title:
+            raise IwExc("Шаблон %s не має параметра з назвою сторінки" % iw.text)
+        if lang == 'd':
+            raise IwExc('Посилання на вікідані поки що в розробці')
+
+        exists, redirect, wikidata_id, translated_into = self.wiki_cache.get_page_and_wikidata(lang, external_title)
+        if not exists:
+            raise IwExc(f"Не знайдено сторінки [[:{lang}:{external_title}]]")
+        if not wikidata_id:
+            raise IwExc(f"Сторінка [[:{lang}:{external_title}]] не має пов'язаного елемента вікіданих")
+
+        here_exists, here_redirect, here_wikidata_id, _ = self.wiki_cache.get_page_and_wikidata('uk', uk_title)
+
+        if here_exists:
+            if here_wikidata_id == wikidata_id:
+                if not here_redirect:
+                    return replacement
                 else:
-                    self.addProblem(
-                        page,
+                    raise IwExc(
                         "Сторінка %s перенаправляє на %s"
-                        % (conv2wikilink(treba), conv2wikilink(HEREredirectTitle)),
+                        % (conv2wikilink(uk_title), conv2wikilink(here_redirect))
                     )
             else:
-                self.addProblem(
-                    page,
+                raise IwExc(
                     "Сторінки [[:%s:%s]] та %s пов'язані з різними елементами вікіданих"
-                    % (mova, ee, conv2wikilink(treba)),
+                    % (lang, external_title, conv2wikilink(uk_title))
                 )
-                return
-        elif tranlsatedInto:
-            if redirect:
-                self.addProblem(
-                    page,
-                    "Сторінка [[:%s:%s]] (→ [[:%s:%s]]) перекладена як %s, хоча хотіли %s"
-                    % (
-                        mova,
-                        ee,
-                        mova,
-                        redirectTitle,
-                        conv2wikilink(tranlsatedInto),
-                        conv2wikilink(treba),
-                    ),
-                )
-            else:
-                self.addProblem(
-                    page,
-                    "Сторінка [[:%s:%s]] перекладена як %s, хоча хотіли %s"
-                    % (mova, ee, conv2wikilink(tranlsatedInto), conv2wikilink(treba)),
-                )
+        else:
+            if translated_into:
+                pagelink = f'[[:{lang}:{external_title}]]'
+                if redirect:
+                    pagelink += f' (→ [[:{lang}:{redirect}]])'
+                raise IwExc(f"Сторінка {pagelink} перекладена як [[{translated_into}]], хоча хотіли [[{uk_title}]]")
 
-    def addProblem(self, page, message):
+    def add_problem(self, page, message):
         page_title = page.title()
         if not page_title in self.problems.keys():
             self.problems[page_title] = []
         self.problems[page_title].append(message)
         print("\t>>> " + message)
-        self.ok = False
-
-    def iwreplace(self, pageText, iw, treba="", tekst=""):
-        if tekst == "":
-            pageText = pageText[: iw.start] + "[[" + treba + "]]" + pageText[iw.end :]
-        elif (treba[0:1].lower() + treba[1:]) == (
-            tekst[0:1].lower() + tekst[1:]
-        ):  # for cases like {{Не перекладено|Марковська модель|марковська модель||Markov model}}
-            pageText = pageText[: iw.start] + "[[" + tekst + "]]" + pageText[iw.end :]
-        else:
-            pageText = (
-                pageText[: iw.start]
-                + "[["
-                + treba
-                + "|"
-                + tekst
-                + "]]"
-                + pageText[iw.end :]
-            )
-
-        return pageText
-
-    def getFields(self, pageText, iw):
-        lfields = TmplOps.getLuaFields(
-            iw, lfieldnames=["треба", "текст", "мова", "є", "nocat"], getFieldPos=False
-        )
-
-        treba = lfields[0]
-        tekst = lfields[1]
-        mova = lfields[2]
-        ee = lfields[3]
-
-        if treba == None or treba == "":
-            raise IwExc("Сторінка містить шаблон {{tl|Не перекладено}} без параметрів")
-
-        if tekst == None:
-            tekst = ""
-        if mova == None or mova == "":
-            mova = "en"
-        if ee == None or ee == "":
-            ee = treba
-
-        return treba, tekst, mova, ee
 
     def format_problems(self):
         probl = '{| class="standard sortable"\n'
@@ -382,107 +260,56 @@ class IwBot(Bot):
 
         probl = (
             "== Сторінки, які можливо потребують уваги ==\n\nСтаном на %s - %s. Всього таких статей %d.\n\n%s"
-            % (self.start.strftime("%d.%m.%Y, %H:%M:%S"), datetime.now().strftime("%d.%m.%Y, %H:%M:%S"), len(self.problems), probl)
+            % (
+                self.start.strftime(TIME_FORMAT),
+                datetime.now().strftime(TIME_FORMAT),
+                len(self.problems),
+                probl,
+            )
         )
         return probl
 
+def get_params(tmpl):
+    """Return values of params for iw template"""
 
-def conv2wikilink(text):
-    if text.startswith("Файл:") or text.startswith("Категорія:"):
-        text = ":" + text
-    return f"[[{text}]]"
+    uk_title, text, lang, external_title = "", "", "", ""
+    for p in tmpl.params:
+        if p.name == "треба" or p.name == "1":
+            uk_title = p.value
+        if p.name == "текст" or p.name == "2":
+            text = p.value
+        if p.name == "мова" or p.name == "3":
+            lang = p.value
+        if p.name == "є" or p.name == "4":
+            external_title = p.value
 
-class WikiCache:
-    """Cache requests to wiki to avoid repeated requests"""
+    if not text:
+        text = uk_title
+    if not lang:
+        lang = "en"
+    if not external_title:
+        external_title = uk_title
 
-    def __init__(self):
-        self.sites = dict(
-            d=pywikibot.Site("wikidata", "wikidata")
-        )
-        self.cache = dict()
-        self.page_cache = dict()
+    return str(uk_title), str(text), str(lang), str(external_title)
 
-    def get_site(self, lang):
-        """Get site by language"""
-        if lang not in self.sites:
-            self.sites[lang] = pywikibot.Site(lang, "wikipedia")
-        return self.sites[lang]
 
-    def get_page(self, lang, title):
-        key = (lang, title)
-        if key not in self.page_cache:
-            self.page_cache[key] = pywikibot.Page(self.get_site(lang), title)
-            self.page_cache[key].exists()
-        return self.page_cache[key]
+def update_page(page, new_text, comment):
+    if page.text == new_text:
+        print("Nothing changed, not saving")
+        return
+    pywikibot.showDiff(page.text, new_text)
+    page.text = new_text
+    try:
+        page.save(comment)
+    except Exception as e:
+        print("ERROR", e)
 
-    def get_iw_data(self, lang, page_title):
-        """Get interwiki data"""
-        if (lang, page_title) not in self.cache:
-            try:
-                data = self._fetch_iw_data(lang, page_title)
-            except Exception as e:
-                data = e
-            self.cache[(lang, page_title)] = data
 
-        res = self.cache[(lang, page_title)]
-        if isinstance(res, Exception):
-            raise res
-        return res
-
-    def _fetch_iw_data(self, lang, page_title):
-        """Do actual request to wiki to fetch interwiki data"""
-        site = self.get_site(lang)
-
-        WikidataID = None
-        redirect = False
-        redirectTitle = None
-        tranlsatedInto = None
-
-        if lang == "d":
-            try:
-                repo = site.data_repository()
-                item = pywikibot.ItemPage(repo, page_title)
-                item.get()
-                WikidataID = item.id
-                sitelinks = item.sitelinks
-                if "ukwiki" in sitelinks.keys():
-                    tranlsatedInto = sitelinks["ukwiki"]
-            except Exception as e:  # TODO: replace by better exception
-                print('!!!' * 100, e)
-                raise IwExc("Сторінка [[:%s:%s]] не має елемента вікіданих (%s)" % (lang, page_title, e))
-        else:
-            page = self.get_page(lang, page_title)
-
-            try:
-                if page.exists():
-                    if page.isRedirectPage():
-                        redirect = True
-                        page = page.getRedirectTarget()
-                        redirectTitle = page.title()
-                else:
-                    raise IwExc("Не знайдено сторінки [[:%s:%s]]" % (lang, page_title))
-            except Exception as e:
-                raise IwExc("Якісь проблеми з назвою [[:%s:%s]] (%s)" % (lang, page_title, e))
-
-            try:
-                item = pywikibot.ItemPage.fromPage(page)
-                item.get()
-                WikidataID = item.id
-                sitelinks = item.sitelinks
-                if "ukwiki" in sitelinks.keys():
-                    tranlsatedInto = sitelinks["ukwiki"]
-            except Exception as e:
-                page = f"[[:{lang}:{redirectTitle}]] (← [[:{lang}:{page_title}]])" if redirect else f"[[:{lang}:{page_title}]]"
-                raise IwExc(f"Сторінка {page} не має елемента вікіданих")
-
-        return WikidataID, redirect, redirectTitle, tranlsatedInto
-
+def is_iw_tmpl(name):
+    return (name[0].upper() + name[1:]) in IWTMPLS
 
 if __name__ == "__main__":
-    # Run with report:
-    # python3.6 iw.py -maxpages:200 -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено" -always
-    # python3.6 iw.py -maxpages:200 -ns:10 -ref:"Шаблон:Не перекладено" -always
-    # python3.6 iw.py -page:"Користувач:Pavlo Chemist/Чернетка"
-
-    robot = IwBot()
-    robot.run()
+    # -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено"
+    # -ns:10 -ref:"Шаблон:Не перекладено"
+    robot = IwBot2("category")
+    robot.run(time_limit=1000)
