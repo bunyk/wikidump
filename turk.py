@@ -46,5 +46,8 @@ class Turk:
 
 if __name__ == '__main__':
     turk = Turk()
-    turk.ask_human()
+    try:
+        turk.ask_human()
+    except KeyboardInterrupt:
+        pass
     turk.save()
