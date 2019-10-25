@@ -20,8 +20,8 @@ import pywikibot
 from pywikibot import pagegenerators, Bot
 import mwparserfromhell
 
-from generalmodule import TmplOps
 from constants import LANGUAGE_CODES
+from turk import Turk
 
 IWTMPLS = ["Не перекладено", "Нп", "Iw", "Нп5", "Iw2"]
 TITLE_EXCEPTIONS = [
@@ -62,11 +62,8 @@ class WikiCache:
             self.cache = dict() # we will save it later
 
     def save(self):
-        try:
-            with open(self.filename, 'w', encoding='utf8') as f:
-                json.dump(self.cache, f, indent=' ', ensure_ascii=False)
-        except Exception as e:
-            import bpython; bpython.embed(locals())
+        with open(self.filename, 'w', encoding='utf8') as f:
+            json.dump(self.cache, f, indent=' ', ensure_ascii=False)
 
     def get_site(self, lang):
         """Get site by language"""
@@ -94,6 +91,15 @@ class WikiCache:
 
     def _fetch_page_and_wikidata(self, lang, title):
         print('fetching', lang, title)
+        if lang == 'd':
+            site = self.get_site('d')
+            repo = site.data_repository()
+            item = pywikibot.ItemPage(repo, title)
+            item.get()
+            wikidata_id = item.id
+            uk_version = item.sitelinks.get('ukwiki')
+            return True, None, wikidata_id, uk_version
+
         page = pywikibot.Page(self.get_site(lang), title)
         exists = page.exists()
         if not exists:
@@ -119,6 +125,7 @@ class IwBot2:
     def __init__(self, method):
         self.method = method
         self.wiki_cache = WikiCache()
+        self.turk = Turk()
 
     def run(self, time_limit=None):
         self.start = datetime.now()
@@ -140,6 +147,7 @@ class IwBot2:
             pass
 
         self.wiki_cache.save()
+        self.turk.save()
 
         page = pywikibot.Page(
             pywikibot.Site(),
@@ -169,8 +177,13 @@ class IwBot2:
                 self.add_problem(page, "Неочікувана помилка (%s) при роботі з шаблоном %s" % (e, tmpl))
 
             if replacement:
-                new_text.replace(str(tmpl), replacement)
-        update_page(page, new_text, REPLACE_SUMMARY)
+                new_text = new_text.replace(str(tmpl), replacement)
+        if new_text == page.text:
+            return
+
+        # DO additional replacements
+        new_text = re.sub(r'\[\[([^|]+)\|\1(\w*)]]', r'[[\1]]\2', new_text)
+        update_page(page, new_text, REPLACE_SUMMARY, yes=True)
 
     def find_replacement(self, tmpl):
         """Return string to which template should be replaced, if it should
@@ -178,17 +191,10 @@ class IwBot2:
         """
         uk_title, text, lang, external_title = get_params(tmpl)
 
-        if text.startswith(uk_title): # TODO: maybe do this shortening as a separate step
-            replacement = f'[[{uk_title}]]{text[len(uk_title):]}'
-        else:
-            replacement = f'[[{uk_title}|{text}]]'
-
         if not lang in LANGUAGE_CODES:
-            raise IwExc('Мовний код "%s" не підтримується' % mova)
+            raise IwExc('Мовний код "%s" не підтримується' % lang)
         if not uk_title:
             raise IwExc("Шаблон %s не має параметра з назвою сторінки" % iw.text)
-        if lang == 'd':
-            raise IwExc('Посилання на вікідані поки що в розробці')
 
         exists, redirect, wikidata_id, translated_into = self.wiki_cache.get_page_and_wikidata(lang, external_title)
         if not exists:
@@ -201,12 +207,24 @@ class IwBot2:
         if here_exists:
             if here_wikidata_id == wikidata_id:
                 if not here_redirect:
-                    return replacement
+                    return f'[[{uk_title}|{text}]]'
                 else:
-                    raise IwExc(
-                        "Сторінка %s перенаправляє на %s"
-                        % (conv2wikilink(uk_title), conv2wikilink(here_redirect))
+                    error_msg = "Сторінка %s перенаправляє на %s" % (
+                        conv2wikilink(uk_title), conv2wikilink(here_redirect)
                     )
+                    answer = self.turk.answer(
+                        error_msg + '\n Що робити?',
+                        'Замінити на посилання на пряму сторінку.',
+                        'Замінити на посилання на перенаправлення.',
+                        'Поки що лишити як є'
+                    )
+                    if answer == 1:
+                        return f'[[{here_redirect}|{text}]]'
+                    if answer == 2:
+                        return f'[[{uk_title}|{text}]]'
+
+                    raise IwExc(error_msg)
+
             else:
                 raise IwExc(
                     "Сторінки [[:%s:%s]] та %s пов'язані з різними елементами вікіданих"
@@ -290,20 +308,24 @@ def get_params(tmpl):
     if not external_title:
         external_title = uk_title
 
-    return str(uk_title), str(text), str(lang), str(external_title)
+    return str(uk_title), str(text), str(lang).strip(), str(external_title)
 
-
-def update_page(page, new_text, comment):
+def update_page(page, new_text, comment, yes=False):
     if page.text == new_text:
         print("Nothing changed, not saving")
         return
     pywikibot.showDiff(page.text, new_text)
-    page.text = new_text
-    try:
-        page.save(comment)
-    except Exception as e:
-        print("ERROR", e)
 
+    if yes or confirmed('Робимо заміну?'):
+        page.text = new_text
+        page.save(comment)
+
+def confirmed(question):
+    return pywikibot.input_choice(
+        question,
+        [('Yes', 'y'), ('No', 'n')],
+        default='N'
+    ) == 'y'
 
 def is_iw_tmpl(name):
     return (name[0].upper() + name[1:]) in IWTMPLS
@@ -312,4 +334,4 @@ if __name__ == "__main__":
     # -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено"
     # -ns:10 -ref:"Шаблон:Не перекладено"
     robot = IwBot2("category")
-    robot.run(time_limit=1000)
+    robot.run(time_limit=3600 * 20)

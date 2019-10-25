@@ -1,5 +1,7 @@
 LANGUAGE_CODES = set([
     "en",
+    "eu",
+    "ku",
     "sv",
     "nl",
     "de",
