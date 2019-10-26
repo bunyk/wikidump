@@ -90,7 +90,6 @@ class WikiCache:
         return res
 
     def _fetch_page_and_wikidata(self, lang, title):
-        print('fetching', lang, title)
         if lang == 'd':
             site = self.get_site('d')
             repo = site.data_repository()
@@ -140,7 +139,10 @@ class IwBot2:
             for n, page in enumerate(generator, 1):
                 duration = (datetime.now() - self.start).seconds
                 print(f"{n}. ({duration}s) Processing [[{page.title()}]]")
-                self.process(page)
+                try:
+                    self.process(page)
+                except Exception as e:
+                    self.add_problem(page, 'Неочікувана помилка: %s' % e)
                 if time_limit and duration >= time_limit:
                     break
         except KeyboardInterrupt:
