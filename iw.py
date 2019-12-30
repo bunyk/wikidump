@@ -23,10 +23,10 @@ import mwparserfromhell
 from constants import LANGUAGE_CODES
 from turk import Turk
 
-IWTMPLS = ["Не перекладено", "Нп", "Iw", "Нп5", "Iw2"]
+IWTMPLS = ["Не перекладено", "Нп", "Iw", "Нп5", "Нп3", "Iw2"]
 TITLE_EXCEPTIONS = [
     "Користувач:",
-    "Вікіпедія:Кнайпа",
+    # "Вікіпедія:Кнайпа",
     "Обговорення:",
     "Обговорення користувача:",
     "Шаблон:Не перекладено",
@@ -134,6 +134,13 @@ class IwBot2:
                 "Категорія:Вікіпедія:Статті з неактуальним шаблоном Не перекладено",
             )
             generator = cat.articles()
+        if self.method == "search":
+            search_query = r'insource:/\{\{(%s|%s)/' % ('|'.join(IWTMPLS), '|'.join(n.lower() for n in IWTMPLS))
+            print("Searching for", search_query)
+            generator = pagegenerators.SearchPageGenerator(
+                search_query
+                # namespaces=[0],
+            )
 
         try:
             for n, page in enumerate(generator, 1):
@@ -176,6 +183,7 @@ class IwBot2:
             except IwExc as e:
                 self.add_problem(page, e.message)
             except Exception as e:
+                traceback.print_exc()
                 self.add_problem(page, "Неочікувана помилка (%s) при роботі з шаблоном %s" % (e, tmpl))
 
             if replacement:
@@ -196,7 +204,7 @@ class IwBot2:
         if not lang in LANGUAGE_CODES:
             raise IwExc('Мовний код "%s" не підтримується' % lang)
         if not uk_title:
-            raise IwExc("Шаблон %s не має параметра з назвою сторінки" % iw.text)
+            raise IwExc("Шаблон %s не має параметра з назвою сторінки" % tmpl)
 
         exists, redirect, wikidata_id, translated_into = self.wiki_cache.get_page_and_wikidata(lang, external_title)
         if not exists:
@@ -228,16 +236,36 @@ class IwBot2:
                     raise IwExc(error_msg)
 
             else:
-                raise IwExc(
-                    "Сторінки [[:%s:%s]] та %s пов'язані з різними елементами вікіданих"
-                    % (lang, external_title, conv2wikilink(uk_title))
+                error_msg = "Сторінки [[:%s:%s]] та %s пов'язані з різними елементами вікіданих" % (
+                    lang, external_title, conv2wikilink(uk_title)
                 )
+                raise IwExc(error_msg)
         else:
             if translated_into:
                 pagelink = f'[[:{lang}:{external_title}]]'
                 if redirect:
                     pagelink += f' (→ [[:{lang}:{redirect}]])'
-                raise IwExc(f"Сторінка {pagelink} перекладена як [[{translated_into}]], хоча хотіли [[{uk_title}]]")
+                error_msg = (f"Сторінка {pagelink} перекладена як "
+                    f"{conv2wikilink(translated_into)}, "
+                    f"хоча хотіли {conv2wikilink(uk_title)}"
+                )
+                answer = self.turk.answer(
+                    error_msg + '\n Що робити?',
+                    'Створити перенаправлення і послатись на основну статтю.',
+                    'Створити перенаправлення і послатись на перенаправлення.',
+                    'Перейменувати і послатись на перейменовану назву.',
+                    'Поки що нічого'
+                )
+                if answer == 1:
+                    create_redirect(uk_title, translated_into)
+                    return f'[[{translated_into}|{text}]]'
+                if answer == 2:
+                    create_redirect(uk_title, translated_into)
+                    return f'[[{uk_title}|{text}]]'
+                if answer == 3:
+                    rename(translated_into, uk_title)
+                    return f'[[{uk_title}|{text}]]'
+                raise IwExc(error_msg)
 
     def add_problem(self, page, message):
         page_title = page.title()
@@ -322,6 +350,21 @@ def update_page(page, new_text, comment, yes=False):
         page.text = new_text
         page.save(comment)
 
+def create_redirect(from_title, to_title):
+    page = pywikibot.Page(
+        pywikibot.Site(),
+        from_title
+    )
+    page.text = f'#ПЕРЕНАПРАВЛЕННЯ [[{to_title}]]'
+    page.save('нове перенаправлення')
+
+def rename(from_title, to_title):
+    page = pywikibot.Page(
+        pywikibot.Site(),
+        from_title
+    )
+    page.move(to_title, 'посилання на назву')
+
 def confirmed(question):
     return pywikibot.input_choice(
         question,
@@ -336,4 +379,6 @@ if __name__ == "__main__":
     # -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено"
     # -ns:10 -ref:"Шаблон:Не перекладено"
     robot = IwBot2("category")
+    # robot.process(pywikibot.Page(pywikibot.Site(), 'Обговорення шаблону:Не перекладено'))
+
     robot.run(time_limit=3600 * 20)

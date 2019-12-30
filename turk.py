@@ -21,7 +21,7 @@ class Turk:
         if question in self.answers:
             res = self.answers[question].get('answer')
             if res:
-                del self.answers[question]
+                self.answers[question]['used'] = True
             return res
 
         self.answers[question] = dict(
@@ -30,12 +30,11 @@ class Turk:
 
     def ask_human(self):
         """ Ask human all pending questions """
-        for question, data in self.answers.items():
-            if data.get('answer') is not None:
-                continue # already answered
+        to_ask = [i for i in self.answers.items() if i[1].get('answer') is None]
+        for i, (question, data) in enumerate(to_ask, 1):
             answer = None
             while not answer:
-                print(question)
+                print(f'{i}/{len(to_ask)}: ', question)
                 for i, var in enumerate(data['variants'], 1):
                     print(f'{i}) {var}')
                 answer = int(input('> '))
