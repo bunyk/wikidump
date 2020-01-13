@@ -85,38 +85,53 @@ class WikiCache:
         res = self._fetch_page_and_wikidata(lang, title)
         self.cache[key] = dict(
             val=res,
-            till=(datetime.now() + timedelta(days=7 if res[0] else 1)).strftime(TIME_FORMAT)
+            till=(datetime.now() + timedelta(days=7 if res['exists'] else 1)).strftime(TIME_FORMAT)
         )
         return res
 
     def _fetch_page_and_wikidata(self, lang, title):
+        res = dict(
+            exists=False,
+            redirect=None,
+            wikidata_id=None,
+            uk_version=None,
+            redirect_wikidata_id=None,
+            redirect_version=None,
+        )
         if lang == 'd':
             site = self.get_site('d')
             repo = site.data_repository()
             item = pywikibot.ItemPage(repo, title)
             item.get()
-            wikidata_id = item.id
-            uk_version = item.sitelinks.get('ukwiki')
-            return True, None, wikidata_id, uk_version
+            res['exists'] = True
+            res['wikidata_id'] = item.id
+            res['uk_version'] = item.sitelinks.get('ukwiki'),
+            return res
 
         page = pywikibot.Page(self.get_site(lang), title)
         exists = page.exists()
         if not exists:
-            return False, None, None, {}
+            return res
 
-        redirect = None
+        res['exists'] = True
         if page.isRedirectPage():
-            page = page.getRedirectTarget()
-            redirect = page.title()
+            redirect = page.getRedirectTarget()
+            try:
+                item = pywikibot.ItemPage.fromPage(redirect)
+                res['redirect_wikidata_id'] = item.id
+                res['redirect_uk_version'] = item.sitelinks.get('ukwiki')
+            except pywikibot.exceptions.NoPage:
+                pass
+            res['redirect'] = redirect.title()
 
         try:
             item = pywikibot.ItemPage.fromPage(page)
-            wikidata_id = item.id
-            uk_version = item.sitelinks.get('ukwiki')
+            res['wikidata_id'] = item.id
+            res['uk_version'] = item.sitelinks.get('ukwiki')
         except pywikibot.exceptions.NoPage:
-            wikidata_id, uk_version = None, None
+            pass
 
-        return exists, redirect, wikidata_id, uk_version
+        return res
 
 class IwBot2:
     problems: Dict[str, List[str]] = {}
@@ -149,7 +164,7 @@ class IwBot2:
                 try:
                     self.process(page)
                 except Exception as e:
-                    self.add_problem(page, 'Неочікувана помилка: %s' % e)
+                    self.add_problem(page, 'Неочікувана помилка: %s %s' % (type(e), e))
                 if time_limit and duration >= time_limit:
                     break
         except KeyboardInterrupt:
@@ -184,7 +199,7 @@ class IwBot2:
                 self.add_problem(page, e.message)
             except Exception as e:
                 traceback.print_exc()
-                self.add_problem(page, "Неочікувана помилка (%s) при роботі з шаблоном %s" % (e, tmpl))
+                self.add_problem(page, "Неочікувана помилка (%s %s) при роботі з шаблоном %s" % (type(e), e, tmpl))
 
             if replacement:
                 new_text = new_text.replace(str(tmpl), replacement)
@@ -206,47 +221,38 @@ class IwBot2:
         if not uk_title:
             raise IwExc("Шаблон %s не має параметра з назвою сторінки" % tmpl)
 
-        exists, redirect, wikidata_id, translated_into = self.wiki_cache.get_page_and_wikidata(lang, external_title)
-        if not exists:
+        there = self.wiki_cache.get_page_and_wikidata(lang, external_title)
+        if not there['exists']:
             raise IwExc(f"Не знайдено сторінки [[:{lang}:{external_title}]]")
-        if not wikidata_id:
-            raise IwExc(f"Сторінка [[:{lang}:{external_title}]] не має пов'язаного елемента вікіданих")
+        if not there['wikidata_id'] or there['redirect_wikidata_id']:
+            return None # this is not a big deal, it will be created when page will have interwiki
+            # raise IwExc(f"Сторінка [[:{lang}:{external_title}]] не має пов'язаного елемента вікіданих")
 
-        here_exists, here_redirect, here_wikidata_id, _ = self.wiki_cache.get_page_and_wikidata('uk', uk_title)
+        here = self.wiki_cache.get_page_and_wikidata('uk', uk_title)
+        # print(tmpl)
+        # print('there:', there)
+        # print('here:', here)
+        # print()
 
-        if here_exists:
-            if here_wikidata_id == wikidata_id:
-                if not here_redirect:
-                    return f'[[{uk_title}|{text}]]'
-                else:
-                    error_msg = "Сторінка %s перенаправляє на %s" % (
-                        conv2wikilink(uk_title), conv2wikilink(here_redirect)
-                    )
-                    answer = self.turk.answer(
-                        error_msg + '\n Що робити?',
-                        'Замінити на посилання на пряму сторінку.',
-                        'Замінити на посилання на перенаправлення.',
-                        'Поки що лишити як є'
-                    )
-                    if answer == 1:
-                        return f'[[{here_redirect}|{text}]]'
-                    if answer == 2:
-                        return f'[[{uk_title}|{text}]]'
-
-                    raise IwExc(error_msg)
-
+        if here['exists']:
+            if (here['wikidata_id'] is not None) and (here['wikidata_id'] == there['wikidata_id']):
+                return f'[[{uk_title}|{text}]]'
+            elif here['redirect'] and not there['redirect'] and (here['redirect_wikidata_id'] == there['wikidata_id']): # where we redirect to is bound to their article
+                return f"[[{here['redirect']}|{text}]]"
+            elif here['redirect'] and there['redirect'] and (here['redirect_wikidata_id'] == there['redirect_wikidata_id']):
+                return f"[[{here['redirect']}|{text}]]"
             else:
                 error_msg = "Сторінки [[:%s:%s]] та %s пов'язані з різними елементами вікіданих" % (
                     lang, external_title, conv2wikilink(uk_title)
                 )
                 raise IwExc(error_msg)
         else:
-            if translated_into:
+            if there['uk_version']:
                 pagelink = f'[[:{lang}:{external_title}]]'
-                if redirect:
+                if there['redirect']:
                     pagelink += f' (→ [[:{lang}:{redirect}]])'
                 error_msg = (f"Сторінка {pagelink} перекладена як "
-                    f"{conv2wikilink(translated_into)}, "
+                    f"{conv2wikilink(there['uk_version'])}, "
                     f"хоча хотіли {conv2wikilink(uk_title)}"
                 )
                 answer = self.turk.answer(
@@ -257,13 +263,13 @@ class IwBot2:
                     'Поки що нічого'
                 )
                 if answer == 1:
-                    create_redirect(uk_title, translated_into)
-                    return f'[[{translated_into}|{text}]]'
+                    create_redirect(uk_title, there['uk_version'])
+                    return f"[[{there['uk_version']}|{text}]]"
                 if answer == 2:
-                    create_redirect(uk_title, translated_into)
+                    create_redirect(uk_title, there['uk_version'])
                     return f'[[{uk_title}|{text}]]'
                 if answer == 3:
-                    rename(translated_into, uk_title)
+                    rename(there['uk_version'], uk_title)
                     return f'[[{uk_title}|{text}]]'
                 raise IwExc(error_msg)
 
@@ -379,6 +385,7 @@ if __name__ == "__main__":
     # -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено"
     # -ns:10 -ref:"Шаблон:Не перекладено"
     robot = IwBot2("category")
-    # robot.process(pywikibot.Page(pywikibot.Site(), 'Обговорення шаблону:Не перекладено'))
-
+    # title = 'Обговорення шаблону:Не перекладено'
+    # title = 'Джин Бартік'
+    # robot.process(pywikibot.Page(pywikibot.Site(), title))
     robot.run(time_limit=3600 * 20)

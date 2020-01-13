@@ -440,14 +440,20 @@ def problems_first_noticed(page, current_problems):
             dates[problem] = prev_revision_time
     return dates
 
+EXISTING_CATEGORIES = set()
 def ensure_category_existence(site, category_name, added):
-    cat = pywikibot.Category(site, get_category_name_for_date(category_name, added))
+    name = get_category_name_for_date(category_name, added)
+    if name in EXISTING_CATEGORIES: # nothing to do
+        return
+    cat = pywikibot.Category(site, name)
     if cat.exists():
         print(cat, 'існує')
+        EXISTING_CATEGORIES.add(name)
         return
     print("Нема", cat, "створюємо")
     cat.text = '{{Щомісячна категорія впорядкування}}'
     cat.save('Створення категорії впорядкування')
+    EXISTING_CATEGORIES.add(name)
 
 def daylight_throttle():
     """ Work slower at day to not disturb human editors much """

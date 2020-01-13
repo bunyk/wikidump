@@ -37,8 +37,11 @@ class Turk:
                 print(f'{i}/{len(to_ask)}: ', question)
                 for i, var in enumerate(data['variants'], 1):
                     print(f'{i}) {var}')
-                answer = int(input('> '))
-                if not (0 < answer <= len(data['variants'])):
+                try:
+                    answer = int(input('> '))
+                    if not (0 < answer <= len(data['variants'])):
+                        answer = None
+                except ValueError:
                     answer = None
             data['answer'] = answer
 
@@ -48,5 +51,7 @@ if __name__ == '__main__':
     try:
         turk.ask_human()
     except KeyboardInterrupt:
+        pass
+    except Exception:
         pass
     turk.save()
