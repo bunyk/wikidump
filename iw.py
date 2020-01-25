@@ -29,6 +29,7 @@ TITLE_EXCEPTIONS = [
     # "Вікіпедія:Кнайпа",
     "Обговорення:",
     "Обговорення користувача:",
+    "Обговорення шаблону:",
     "Шаблон:Не перекладено",
     "Вікіпедія:Завдання для роботів",
     "Вікіпедія:Проект:Біологія/Неперекладені статті",
@@ -186,29 +187,41 @@ class IwBot2:
         """Process page to remove unnecessary iw templates"""
         for exc in TITLE_EXCEPTIONS:
             if page.title().startswith(exc):
+                print("Skipping page because of title")
                 return
         new_text = page.text
+        new_text = re.sub(r'<!-- Проблема вікіфікації: .+? \(BunykBot\)-->', '', new_text)
         code = mwparserfromhell.parse(new_text)
+        summary = set()
         for tmpl in code.filter_templates():
             if not is_iw_tmpl(tmpl.name):
                 continue
             replacement = False
+            problem = False
             try:
                 replacement = self.find_replacement(tmpl)
             except IwExc as e:
                 self.add_problem(page, e.message)
+                problem = str(tmpl) + '<!-- Проблема вікіфікації: ' + e.message + ' (BunykBot)-->'
             except Exception as e:
                 traceback.print_exc()
                 self.add_problem(page, "Неочікувана помилка (%s %s) при роботі з шаблоном %s" % (type(e), e, tmpl))
 
             if replacement:
                 new_text = new_text.replace(str(tmpl), replacement)
+                summary.add(REPLACE_SUMMARY)
+            if problem:
+                new_text = new_text.replace(str(tmpl), problem)
+                summary.add('повідомлення про помилки вікіфікації')
+
+        new_text = re.sub(r'<!--(.+?)-->(<!--\1-->)+', r'<!--\1-->', new_text)
+
         if new_text == page.text:
             return
 
         # DO additional replacements
         new_text = re.sub(r'\[\[([^|]+)\|\1(\w*)]]', r'[[\1]]\2', new_text)
-        update_page(page, new_text, REPLACE_SUMMARY, yes=True)
+        update_page(page, new_text, ', '.join(summary), yes=True)
 
     def find_replacement(self, tmpl):
         """Return string to which template should be replaced, if it should
@@ -259,6 +272,7 @@ class IwBot2:
                     error_msg + '\n Що робити?',
                     'Створити перенаправлення і послатись на основну статтю.',
                     'Створити перенаправлення і послатись на перенаправлення.',
+                    'Послатись на основну статтю.',
                     'Перейменувати і послатись на перейменовану назву.',
                     'Поки що нічого'
                 )
@@ -269,6 +283,8 @@ class IwBot2:
                     create_redirect(uk_title, there['uk_version'])
                     return f'[[{uk_title}|{text}]]'
                 if answer == 3:
+                    return f"[[{there['uk_version']}|{text}]]"
+                if answer == 4:
                     rename(there['uk_version'], uk_title)
                     return f'[[{uk_title}|{text}]]'
                 raise IwExc(error_msg)
@@ -379,13 +395,14 @@ def confirmed(question):
     ) == 'y'
 
 def is_iw_tmpl(name):
-    return (name[0].upper() + name[1:]) in IWTMPLS
+    n = name.strip()
+    return (n[0].upper() + n[1:]) in IWTMPLS
 
 if __name__ == "__main__":
     # -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено"
     # -ns:10 -ref:"Шаблон:Не перекладено"
     robot = IwBot2("category")
     # title = 'Обговорення шаблону:Не перекладено'
-    # title = 'Джин Бартік'
+    # title = 'Мелані Лінскі'
     # robot.process(pywikibot.Page(pywikibot.Site(), title))
     robot.run(time_limit=3600 * 20)
