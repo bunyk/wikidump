@@ -106,7 +106,7 @@ class WikiCache:
             item.get()
             res['exists'] = True
             res['wikidata_id'] = item.id
-            res['uk_version'] = item.sitelinks.get('ukwiki'),
+            res['uk_version'] = item.sitelinks.get('ukwiki')
             return res
 
         page = pywikibot.Page(self.get_site(lang), title)
@@ -154,8 +154,12 @@ class IwBot2:
             search_query = r'insource:/\{\{(%s|%s)/' % ('|'.join(IWTMPLS), '|'.join(n.lower() for n in IWTMPLS))
             print("Searching for", search_query)
             generator = pagegenerators.SearchPageGenerator(
-                search_query
-                # namespaces=[0],
+                search_query,
+                namespaces=[
+                    0, # main
+                    4, # Вікіпедія
+                    10, # template
+                ],
             )
 
         try:
@@ -190,7 +194,8 @@ class IwBot2:
                 print("Skipping page because of title")
                 return
         new_text = page.text
-        new_text = re.sub(r'<!-- Проблема вікіфікації: .+? \(BunykBot\)-->', '', new_text)
+        if self.method == 'category':
+            new_text = re.sub(r'<!-- Проблема вікіфікації: .+? \(BunykBot\)-->', '', new_text)
         code = mwparserfromhell.parse(new_text)
         summary = set()
         for tmpl in code.filter_templates():
@@ -210,11 +215,12 @@ class IwBot2:
             if replacement:
                 new_text = new_text.replace(str(tmpl), replacement)
                 summary.add(REPLACE_SUMMARY)
-            if problem:
+            if problem and (self.method == 'category'):
                 new_text = new_text.replace(str(tmpl), problem)
                 summary.add('повідомлення про помилки вікіфікації')
 
-        new_text = re.sub(r'<!--(.+?)-->(<!--\1-->)+', r'<!--\1-->', new_text)
+        if self.method == 'category':
+            new_text = re.sub(r'<!--(.+?)-->(<!--\1-->)+', r'<!--\1-->', new_text)
 
         if new_text == page.text:
             return
@@ -237,11 +243,14 @@ class IwBot2:
         there = self.wiki_cache.get_page_and_wikidata(lang, external_title)
         if not there['exists']:
             raise IwExc(f"Не знайдено сторінки [[:{lang}:{external_title}]]")
-        if not there['wikidata_id'] or there['redirect_wikidata_id']:
-            return None # this is not a big deal, it will be created when page will have interwiki
-            # raise IwExc(f"Сторінка [[:{lang}:{external_title}]] не має пов'язаного елемента вікіданих")
 
         here = self.wiki_cache.get_page_and_wikidata('uk', uk_title)
+        if not (there['wikidata_id'] or there['redirect_wikidata_id']):
+            if here['exists']:
+                raise IwExc(f"Сторінка [[:{lang}:{external_title}]] не має пов'язаного елемента вікіданих")
+            else:
+                return None # this is not a big deal, maybe they will create it before us
+
         # print(tmpl)
         # print('there:', there)
         # print('here:', here)
@@ -401,8 +410,10 @@ def is_iw_tmpl(name):
 if __name__ == "__main__":
     # -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено"
     # -ns:10 -ref:"Шаблон:Не перекладено"
-    robot = IwBot2("category")
+    # robot = IwBot2("category")
+    robot = IwBot2("search")
     # title = 'Обговорення шаблону:Не перекладено'
-    # title = 'Мелані Лінскі'
+    # title = 'Miracle of Sound'
+    # title = '261 до н. е.'
     # robot.process(pywikibot.Page(pywikibot.Site(), title))
     robot.run(time_limit=3600 * 20)
