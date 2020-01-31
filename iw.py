@@ -15,6 +15,7 @@ import sys, re, json
 from datetime import datetime, timedelta
 import traceback
 from typing import List, Dict
+import itertools
 
 import pywikibot
 from pywikibot import pagegenerators, Bot
@@ -23,9 +24,9 @@ import mwparserfromhell
 from constants import LANGUAGE_CODES
 from turk import Turk
 
-IWTMPLS = ["Не перекладено", "Нп", "Iw", "Нп5", "Нп3", "Iw2"]
+IWTMPLS = ["Не перекладено", "Нп", "Iw", "Нп5", "Нп3", "Iw2", "НП5"]
 TITLE_EXCEPTIONS = [
-    "Користувач:",
+#     "Користувач:",
     # "Вікіпедія:Кнайпа",
     "Обговорення:",
     "Обговорення користувача:",
@@ -151,16 +152,15 @@ class IwBot2:
             )
             generator = cat.articles()
         if self.method == "search":
-            search_query = r'insource:/\{\{(%s|%s)/' % ('|'.join(IWTMPLS), '|'.join(n.lower() for n in IWTMPLS))
-            print("Searching for", search_query)
-            generator = pagegenerators.SearchPageGenerator(
-                search_query,
+            # search_query = r'insource:/\{\{(%s|%s)/' % ('|'.join(IWTMPLS), '|'.join(n.lower() for n in IWTMPLS))
+            generator = itertools.chain(*[pagegenerators.SearchPageGenerator(
+                'insource:"{{' + name_form + '|"',
                 namespaces=[
                     0, # main
                     4, # Вікіпедія
                     10, # template
                 ],
-            )
+            ) for name_form in IWTMPLS + [n.lower() for n in IWTMPLS]])
 
         try:
             for n, page in enumerate(generator, 1):
@@ -201,6 +201,7 @@ class IwBot2:
         for tmpl in code.filter_templates():
             if not is_iw_tmpl(tmpl.name):
                 continue
+            print(tmpl)
             replacement = False
             problem = False
             try:
@@ -251,16 +252,13 @@ class IwBot2:
             else:
                 return None # this is not a big deal, maybe they will create it before us
 
-        # print(tmpl)
-        # print('there:', there)
-        # print('here:', here)
-        # print()
-
         if here['exists']:
             if (here['wikidata_id'] is not None) and (here['wikidata_id'] == there['wikidata_id']):
                 return f'[[{uk_title}|{text}]]'
             elif here['redirect'] and not there['redirect'] and (here['redirect_wikidata_id'] == there['wikidata_id']): # where we redirect to is bound to their article
                 return f"[[{here['redirect']}|{text}]]"
+            elif not here['redirect'] and there['redirect'] and (here['wikidata_id'] == there['redirect_wikidata_id']): # where they redirect to is bound to ours article
+                return f"[[{uk_title}|{text}]]"
             elif here['redirect'] and there['redirect'] and (here['redirect_wikidata_id'] == there['redirect_wikidata_id']):
                 return f"[[{here['redirect']}|{text}]]"
             else:
@@ -353,13 +351,23 @@ def get_params(tmpl):
 
     uk_title, text, lang, external_title = "", "", "", ""
     for p in tmpl.params:
-        if p.name == "треба" or p.name == "1":
+        if p.name == "1":
             uk_title = p.value
-        if p.name == "текст" or p.name == "2":
+        if p.name == "2":
             text = p.value
-        if p.name == "мова" or p.name == "3":
+        if p.name == "3":
             lang = p.value
-        if p.name == "є" or p.name == "4":
+        if p.name == "4":
+            external_title = p.value
+
+    for p in tmpl.params:
+        if p.name == "треба":
+            uk_title = p.value
+        if p.name == "текст":
+            text = p.value
+        if p.name == "мова":
+            lang = p.value
+        if p.name == "є":
             external_title = p.value
 
     if not text:
@@ -410,10 +418,8 @@ def is_iw_tmpl(name):
 if __name__ == "__main__":
     # -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено"
     # -ns:10 -ref:"Шаблон:Не перекладено"
-    # robot = IwBot2("category")
-    robot = IwBot2("search")
-    # title = 'Обговорення шаблону:Не перекладено'
-    # title = 'Miracle of Sound'
-    # title = '261 до н. е.'
+    robot = IwBot2("category")
+    # robot = IwBot2("search")
+    # title = 'Користувач:Bunyk/Чернетка'
     # robot.process(pywikibot.Page(pywikibot.Site(), title))
     robot.run(time_limit=3600 * 20)
