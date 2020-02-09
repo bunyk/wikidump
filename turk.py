@@ -34,7 +34,7 @@ class Turk:
         for i, (question, data) in enumerate(to_ask, 1):
             answer = None
             while not answer:
-                print(f'{i}/{len(to_ask)}: ', question)
+                print(f'\n\n{i}/{len(to_ask)}: ', question)
                 for i, var in enumerate(data['variants'], 1):
                     print(f'{i}) {var}')
                 try:

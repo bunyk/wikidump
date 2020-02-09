@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 import traceback
 from typing import List, Dict
 import itertools
+from collections import Counter
 
 import pywikibot
 from pywikibot import pagegenerators, Bot
@@ -141,7 +142,9 @@ class IwBot2:
     def __init__(self, method):
         self.method = method
         self.wiki_cache = WikiCache()
+        self.processed_pages = set()
         self.turk = Turk()
+        self.to_translate = Counter()
 
     def run(self, time_limit=None):
         self.start = datetime.now()
@@ -161,11 +164,14 @@ class IwBot2:
                     10, # template
                 ],
             ) for name_form in IWTMPLS + [n.lower() for n in IWTMPLS]])
-
+        if self.method == "problems":
+            generator = pagegenerators.SearchPageGenerator(
+                'insource:"}}<!-- Проблема вікіфікації"'
+            )
         try:
-            for n, page in enumerate(generator, 1):
+            for page in generator:
                 duration = (datetime.now() - self.start).seconds
-                print(f"{n}. ({duration}s) Processing [[{page.title()}]]")
+                print(f"{len(self.processed_pages)}. ({duration}s) Processing [[{page.title()}]]")
                 try:
                     self.process(page)
                 except Exception as e:
@@ -178,14 +184,21 @@ class IwBot2:
         self.wiki_cache.save()
         self.turk.save()
 
+        print(len(self.processed_pages), "pages were processed")
+        print("Finished in %s seconds" % (datetime.now() - self.start).seconds)
+
+        page = pywikibot.Page(
+            pywikibot.Site(),
+            'Користувач:BunykBot/Найпотрібніші переклади',
+        )
+        update_page(page, self.format_top(), 'Автоматичне оновлення таблиць', yes=True)
+
         page = pywikibot.Page(
             pywikibot.Site(),
             'Користувач:BunykBot/Сторінки з неправильно використаним шаблоном "Не перекладено"',
         )
-        update_page(page, self.format_problems(), 'Автоматичне оновлення таблиць')
+        update_page(page, self.format_problems(), 'Автоматичне оновлення таблиць', yes=True)
 
-        print("%d pages were processed" % n)
-        print("Finished in %s seconds" % (datetime.now() - self.start).seconds)
 
     def process(self, page):
         """Process page to remove unnecessary iw templates"""
@@ -193,15 +206,17 @@ class IwBot2:
             if page.title().startswith(exc):
                 print("Skipping page because of title")
                 return
+        if page.title() in self.processed_pages:
+            print("Page was already processed")
+            return
+        self.processed_pages.add(page.title())
         new_text = page.text
-        if self.method == 'category':
-            new_text = re.sub(r'<!-- Проблема вікіфікації: .+? \(BunykBot\)-->', '', new_text)
+        new_text = re.sub(r'<!-- Проблема вікіфікації: .+? \(BunykBot\)-->', '', new_text)
         code = mwparserfromhell.parse(new_text)
         summary = set()
         for tmpl in code.filter_templates():
             if not is_iw_tmpl(tmpl.name):
                 continue
-            print(tmpl)
             replacement = False
             problem = False
             try:
@@ -216,11 +231,11 @@ class IwBot2:
             if replacement:
                 new_text = new_text.replace(str(tmpl), replacement)
                 summary.add(REPLACE_SUMMARY)
-            if problem and (self.method == 'category'):
+            if problem:
                 new_text = new_text.replace(str(tmpl), problem)
                 summary.add('повідомлення про помилки вікіфікації')
 
-        if self.method == 'category':
+        if self.method != 'search':
             new_text = re.sub(r'<!--(.+?)-->(<!--\1-->)+', r'<!--\1-->', new_text)
 
         if new_text == page.text:
@@ -245,6 +260,8 @@ class IwBot2:
         if not there['exists']:
             raise IwExc(f"Не знайдено сторінки [[:{lang}:{external_title}]]")
 
+        self.to_translate.update([(lang, external_title)])
+
         here = self.wiki_cache.get_page_and_wikidata('uk', uk_title)
         if not (there['wikidata_id'] or there['redirect_wikidata_id']):
             if here['exists']:
@@ -253,13 +270,21 @@ class IwBot2:
                 return None # this is not a big deal, maybe they will create it before us
 
         if here['exists']:
-            if (here['wikidata_id'] is not None) and (here['wikidata_id'] == there['wikidata_id']):
+            if (
+                (here['wikidata_id'] is not None)
+                and (
+                    (here['wikidata_id'] == there['wikidata_id'])
+                    or (here['wikidata_id'] == there['redirect_wikidata_id'])
+                )
+            ):
                 return f'[[{uk_title}|{text}]]'
-            elif here['redirect'] and not there['redirect'] and (here['redirect_wikidata_id'] == there['wikidata_id']): # where we redirect to is bound to their article
-                return f"[[{here['redirect']}|{text}]]"
-            elif not here['redirect'] and there['redirect'] and (here['wikidata_id'] == there['redirect_wikidata_id']): # where they redirect to is bound to ours article
-                return f"[[{uk_title}|{text}]]"
-            elif here['redirect'] and there['redirect'] and (here['redirect_wikidata_id'] == there['redirect_wikidata_id']):
+            elif (
+                here['redirect'] and (here['redirect_wikidata_id'] is not None)
+                and (
+                    (here['redirect_wikidata_id'] == there['wikidata_id'])
+                    or (here['redirect_wikidata_id'] == there['redirect_wikidata_id'])
+                )
+            ): # where we redirect to is bound to their article
                 return f"[[{here['redirect']}|{text}]]"
             else:
                 error_msg = "Сторінки [[:%s:%s]] та %s пов'язані з різними елементами вікіданих" % (
@@ -303,6 +328,16 @@ class IwBot2:
         self.problems[page_title].append(message)
         print("\t>>> " + message)
 
+    def format_top(self):
+        top = '100 найпотрібніших перекладів:\n'
+        top += '{| class="standard sortable"\n'
+        top += "! Сторінка до перекладу || N\n"
+        for page, n in self.to_translate.most_common(100):
+            top += '|-\n| [[:%s:%s]] || %d\n' % (page[0], page[1], n)
+        top += "|}"
+        return top
+
+
     def format_problems(self):
         probl = '{| class="standard sortable"\n'
         probl += "! Стаття з проблемами || Опис проблеми || N\n"
@@ -336,8 +371,11 @@ class IwBot2:
         probl += "|}"
 
         probl = (
-            "== Сторінки, які можливо потребують уваги ==\n\nСтаном на %s - %s. Всього таких статей %d.\n\n%s"
+            "Переглянуто %d сторінок\n\n"
+            "== Сторінки, які можливо потребують уваги ==\n\n"
+            "Станом на %s - %s. Всього таких сторінок %d.\n\n%s"
             % (
+                len(self.processed_pages),
                 self.start.strftime(TIME_FORMAT),
                 datetime.now().strftime(TIME_FORMAT),
                 len(self.problems),
@@ -349,26 +387,31 @@ class IwBot2:
 def get_params(tmpl):
     """Return values of params for iw template"""
 
+    sstr = lambda v: str(v).strip()
     uk_title, text, lang, external_title = "", "", "", ""
     for p in tmpl.params:
-        if p.name == "1":
-            uk_title = p.value
-        if p.name == "2":
-            text = p.value
-        if p.name == "3":
-            lang = p.value
-        if p.name == "4":
-            external_title = p.value
+        name = sstr(p.name)
+        val = sstr(p.value)
+        if name == "1":
+            uk_title = val
+        if name == "2":
+            text = val
+        if name == "3":
+            lang = val
+        if name == "4":
+            external_title = val
 
     for p in tmpl.params:
-        if p.name == "треба":
-            uk_title = p.value
-        if p.name == "текст":
-            text = p.value
-        if p.name == "мова":
-            lang = p.value
-        if p.name == "є":
-            external_title = p.value
+        val = sstr(p.value)
+        name = sstr(p.name)
+        if name == "треба":
+            uk_title = val
+        if name == "текст":
+            text = val
+        if name == "мова":
+            lang = val
+        if name == "є":
+            external_title = val
 
     if not text:
         text = uk_title
@@ -377,7 +420,7 @@ def get_params(tmpl):
     if not external_title:
         external_title = uk_title
 
-    return str(uk_title), str(text), str(lang).strip(), str(external_title)
+    return uk_title, text, lang, external_title
 
 def update_page(page, new_text, comment, yes=False):
     if page.text == new_text:
@@ -418,8 +461,11 @@ def is_iw_tmpl(name):
 if __name__ == "__main__":
     # -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено"
     # -ns:10 -ref:"Шаблон:Не перекладено"
-    robot = IwBot2("category")
-    # robot = IwBot2("search")
+    # robot = IwBot2("category")
+    # robot = IwBot2("problems")
+    robot = IwBot2("search")
     # title = 'Користувач:Bunyk/Чернетка'
-    # robot.process(pywikibot.Page(pywikibot.Site(), title))
-    robot.run(time_limit=3600 * 20)
+    # title = 'Шаблон:Статистика'
+    #robot.process(pywikibot.Page(pywikibot.Site(), title))
+    #robot.turk.save()
+    robot.run(time_limit=3600 * 11)

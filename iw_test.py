@@ -37,3 +37,11 @@ def test_get_params():
     assert text == 'text'
     assert lang == 'lang'
     assert external_title == 'exists'
+
+    tmpl = parse_tmpl('{{не перекладено | є =B |мова=en| треба = Б}}')
+    uk_title, text, lang, external_title = get_params(tmpl)
+
+    assert uk_title == 'Б'
+    assert text == 'Б'
+    assert lang == 'en'
+    assert external_title == 'B'
