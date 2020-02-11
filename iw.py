@@ -235,8 +235,8 @@ class IwBot2:
                 new_text = new_text.replace(str(tmpl), problem)
                 summary.add('повідомлення про помилки вікіфікації')
 
-        if self.method != 'search':
-            new_text = re.sub(r'<!--(.+?)-->(<!--\1-->)+', r'<!--\1-->', new_text)
+        # avoid duplication of comments
+        new_text = re.sub(r'<!--(.+?)-->(<!--\1-->)+', r'<!--\1-->', new_text)
 
         if new_text == page.text:
             return
@@ -295,7 +295,7 @@ class IwBot2:
             if there['uk_version']:
                 pagelink = f'[[:{lang}:{external_title}]]'
                 if there['redirect']:
-                    pagelink += f' (→ [[:{lang}:{redirect}]])'
+                    pagelink += f' (→ [[:{lang}:{there["redirect"]}]])'
                 error_msg = (f"Сторінка {pagelink} перекладена як "
                     f"{conv2wikilink(there['uk_version'])}, "
                     f"хоча хотіли {conv2wikilink(uk_title)}"
@@ -468,4 +468,4 @@ if __name__ == "__main__":
     # title = 'Шаблон:Статистика'
     #robot.process(pywikibot.Page(pywikibot.Site(), title))
     #robot.turk.save()
-    robot.run(time_limit=3600 * 11)
+    robot.run(time_limit=3600 * 48)
