@@ -5,14 +5,11 @@ Distributed under the terms of the MIT license.
 
 This bot will substitute iwtmpl {{Не перекладено}} and its aliases
 with wiki-link, if the page-to-be-translated is already translated.
-
-Arguments:
-   -maxpages:n : process at most n pages
-   -help       : print this help and exit
 """
 
 import sys, re, json
 from datetime import datetime, timedelta
+from time import time
 import traceback
 from typing import List, Dict
 import itertools
@@ -56,7 +53,7 @@ def conv2wikilink(text):
 class WikiCache:
     """Cache requests to wiki to avoid repeated requests"""
 
-    def __init__(self, filename=None):
+    def __init__(self, filename='cache.json'):
         self.sites = dict(d=pywikibot.Site("wikidata", "wikidata"))
         self.filename = filename
         try:
@@ -181,21 +178,26 @@ class IwBot2:
             pass
 
     def run_mixed(self):
-        def interrupt():
-            self.start = datetime.now()
-            subbot = IwBot2()
-            subbot.start = datetime.now()
-            subbot.problems = self.problems
-            for _ in subbot.run('category'):
-                pass
-            for _ in subbot.run('problems'):
-                pass
-            subbot.update_problems()
 
-        interrupt()
+        def interrupt():
+            self.cache.save()
+            self.cache = WikiCache(filename=None) # temporarily ignore cache
+            slowly_processed = self.processed_pages
+            self.processed_pages = set()
+
+            for _ in self.run('category'):
+                pass
+            for _ in self.run('problems'):
+                pass
+            self.update_problems()
+
+            self.cache = WikiCache()
+            self.processed_pages = slowly_processed | self.processed_pages
+
+        start = datetime.now()
         for _ in self.run('search'):
-            if (datetime.now() - self.start) < timedelta(hours=8):
-                self.start = datetime.now()
+            if (datetime.now() - start) > timedelta(hours=8):
+                start = datetime.now()
                 interrupt()
         interrupt()
         self.save_work()
@@ -205,7 +207,6 @@ class IwBot2:
         self.turk.save()
 
         print(len(self.processed_pages), "pages were processed")
-        print("Finished in %s seconds" % (datetime.now() - self.start).seconds)
 
         page = pywikibot.Page(
             pywikibot.Site(),
@@ -265,7 +266,7 @@ class IwBot2:
         if new_text == page.text:
             return
 
-        # DO additional replacements
+        # Do additional replacements
         new_text = re.sub(r'\[\[([^|]+)\|\1(\w*)]]', r'[[\1]]\2', new_text)
         update_page(page, new_text, ', '.join(summary), yes=True)
 
@@ -399,11 +400,9 @@ class IwBot2:
         probl = (
             "Переглянуто %d сторінок\n\n"
             "== Сторінки, які можливо потребують уваги ==\n\n"
-            "Станом на %s - %s. Всього таких сторінок %d.\n\n%s"
+            "Всього таких сторінок %d.\n\n%s"
             % (
                 len(self.processed_pages),
-                self.start.strftime(TIME_FORMAT),
-                datetime.now().strftime(TIME_FORMAT),
                 len(self.problems),
                 probl,
             )
@@ -446,7 +445,7 @@ def get_params(tmpl):
     if not external_title:
         external_title = uk_title
 
-    return uk_title, text, lang, external_title
+    return uk_title, text, lang.lower(), external_title
 
 
 def update_page(page, new_text, comment, yes=False):
@@ -488,8 +487,7 @@ def is_iw_tmpl(name):
 
 if __name__ == "__main__":
     robot = IwBot2()
-    robot.wiki_cache = WikiCache(filename="cache.json")
     robot.run_mixed()
     # title = 'Користувач:Bunyk/Чернетка'
-    # title = 'Марк Волберг'
+    # title = 'PlayStation 4'
     # robot.process(pywikibot.Page(pywikibot.Site(), title))
