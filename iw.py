@@ -47,24 +47,29 @@ class IwExc(Exception):
 
 
 def conv2wikilink(text):
+    if isinstance(text, pywikibot.page.SiteLink):
+        text = text.title
     if text.startswith("Файл:") or text.startswith("Категорія:"):
         text = ":" + text
     return f"[[{text}]]"
 
-
 class WikiCache:
     """Cache requests to wiki to avoid repeated requests"""
 
-    def __init__(self, filename='cache.json'):
+    def __init__(self, filename=None):
         self.sites = dict(d=pywikibot.Site("wikidata", "wikidata"))
         self.filename = filename
         try:
+            if not filename:
+                raise FileNotFoundError
             with open(filename) as f:
                 self.cache = json.load(f)
         except FileNotFoundError:
             self.cache = dict() # we will save it later
 
     def save(self):
+        if not self.filename:
+            return
         with open(self.filename, 'w', encoding='utf8') as f:
             json.dump(self.cache, f, indent=' ', ensure_ascii=False)
 
@@ -137,25 +142,22 @@ class WikiCache:
         return res
 
 class IwBot2:
-    problems: Dict[str, List[str]] = {}
 
-    def __init__(self, method):
-        self.method = method
+    def __init__(self):
+        self.problems: Dict[str, List[str]] = {}
         self.wiki_cache = WikiCache()
         self.processed_pages = set()
         self.turk = Turk()
         self.to_translate = Counter()
 
-    def run(self, time_limit=None):
-        self.start = datetime.now()
-        if self.method == "category":
+    def run(self, method='search'):
+        if method == "category":
             cat = pywikibot.Category(
                 pywikibot.Site(),
                 "Категорія:Вікіпедія:Статті з неактуальним шаблоном Не перекладено",
             )
             generator = cat.articles()
-        if self.method == "search":
-            # search_query = r'insource:/\{\{(%s|%s)/' % ('|'.join(IWTMPLS), '|'.join(n.lower() for n in IWTMPLS))
+        if method == "search":
             generator = itertools.chain(*[pagegenerators.SearchPageGenerator(
                 'insource:"{{' + name_form + '|"',
                 namespaces=[
@@ -164,23 +166,41 @@ class IwBot2:
                     10, # template
                 ],
             ) for name_form in IWTMPLS + [n.lower() for n in IWTMPLS]])
-        if self.method == "problems":
+        if method == "problems":
             generator = pagegenerators.SearchPageGenerator(
                 'insource:"}}<!-- Проблема вікіфікації"'
             )
         try:
             for page in generator:
-                duration = (datetime.now() - self.start).seconds
-                print(f"{len(self.processed_pages)}. ({duration}s) Processing [[{page.title()}]]")
                 try:
                     self.process(page)
                 except Exception as e:
                     self.add_problem(page, 'Неочікувана помилка: %s %s' % (type(e), e))
-                if time_limit and duration >= time_limit:
-                    break
+                yield 
         except KeyboardInterrupt:
             pass
 
+    def run_mixed(self):
+        def interrupt():
+            self.start = datetime.now()
+            subbot = IwBot2()
+            subbot.start = datetime.now()
+            subbot.problems = self.problems
+            for _ in subbot.run('category'):
+                pass
+            for _ in subbot.run('problems'):
+                pass
+            subbot.update_problems()
+
+        interrupt()
+        for _ in self.run('search'):
+            if (datetime.now() - self.start) < timedelta(hours=8):
+                self.start = datetime.now()
+                interrupt()
+        interrupt()
+        self.save_work()
+
+    def save_work(self):
         self.wiki_cache.save()
         self.turk.save()
 
@@ -192,7 +212,9 @@ class IwBot2:
             'Користувач:BunykBot/Найпотрібніші переклади',
         )
         update_page(page, self.format_top(), 'Автоматичне оновлення таблиць', yes=True)
+        self.update_problems()
 
+    def update_problems(self):
         page = pywikibot.Page(
             pywikibot.Site(),
             'Користувач:BunykBot/Сторінки з неправильно використаним шаблоном "Не перекладено"',
@@ -202,6 +224,7 @@ class IwBot2:
 
     def process(self, page):
         """Process page to remove unnecessary iw templates"""
+        print(f"{len(self.processed_pages)}. Processing [[{page.title()}]]")
         for exc in TITLE_EXCEPTIONS:
             if page.title().startswith(exc):
                 print("Skipping page because of title")
@@ -214,6 +237,7 @@ class IwBot2:
         new_text = re.sub(r'<!-- Проблема вікіфікації: .+? \(BunykBot\)-->', '', new_text)
         code = mwparserfromhell.parse(new_text)
         summary = set()
+        self.problems[page.title()] = [] # clear problems
         for tmpl in code.filter_templates():
             if not is_iw_tmpl(tmpl.name):
                 continue
@@ -350,6 +374,8 @@ class IwBot2:
                     firstMessage = prob
                 else:
                     tablAppend += "|-\n| %s\n" % prob
+            if Nproblems == 0:
+                continue # no problems
 
             problemText = conv2wikilink(problem)
 
@@ -422,10 +448,12 @@ def get_params(tmpl):
 
     return uk_title, text, lang, external_title
 
+
 def update_page(page, new_text, comment, yes=False):
     if page.text == new_text:
         print("Nothing changed, not saving")
         return
+
     pywikibot.showDiff(page.text, new_text)
 
     if yes or confirmed('Робимо заміну?'):
@@ -459,13 +487,9 @@ def is_iw_tmpl(name):
     return (n[0].upper() + n[1:]) in IWTMPLS
 
 if __name__ == "__main__":
-    # -cat:"Вікіпедія:Статті з неактуальним шаблоном Не перекладено"
-    # -ns:10 -ref:"Шаблон:Не перекладено"
-    # robot = IwBot2("category")
-    # robot = IwBot2("problems")
-    robot = IwBot2("search")
+    robot = IwBot2()
+    robot.wiki_cache = WikiCache(filename="cache.json")
+    robot.run_mixed()
     # title = 'Користувач:Bunyk/Чернетка'
-    # title = 'Шаблон:Статистика'
-    #robot.process(pywikibot.Page(pywikibot.Site(), title))
-    #robot.turk.save()
-    robot.run(time_limit=3600 * 48)
+    # title = 'Марк Волберг'
+    # robot.process(pywikibot.Page(pywikibot.Site(), title))
