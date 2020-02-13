@@ -180,8 +180,8 @@ class IwBot2:
     def run_mixed(self):
 
         def interrupt():
-            self.cache.save()
-            self.cache = WikiCache(filename=None) # temporarily ignore cache
+            self.wiki_cache.save()
+            self.wiki_cache = WikiCache(filename=None) # temporarily ignore cache
             slowly_processed = self.processed_pages
             self.processed_pages = set()
 
@@ -191,7 +191,7 @@ class IwBot2:
                 pass
             self.update_problems()
 
-            self.cache = WikiCache()
+            self.wiki_cache = WikiCache()
             self.processed_pages = slowly_processed | self.processed_pages
 
         start = datetime.now()
@@ -486,6 +486,7 @@ def is_iw_tmpl(name):
     return (n[0].upper() + n[1:]) in IWTMPLS
 
 if __name__ == "__main__":
+    print('lets go!')
     robot = IwBot2()
     robot.run_mixed()
     # title = 'Користувач:Bunyk/Чернетка'
