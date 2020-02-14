@@ -44,8 +44,6 @@ class IwExc(Exception):
 
 
 def conv2wikilink(text):
-    if isinstance(text, pywikibot.page.SiteLink):
-        text = text.title
     if text.startswith("Файл:") or text.startswith("Категорія:"):
         text = ":" + text
     return f"[[{text}]]"
@@ -103,6 +101,11 @@ class WikiCache:
             redirect_wikidata_id=None,
             redirect_version=None,
         )
+        def get_uk_version(item)
+            sl = item.sitelinks.get(sitename)
+            if sl:
+                return sl.title
+
         if lang == 'd':
             site = self.get_site('d')
             repo = site.data_repository()
@@ -110,7 +113,7 @@ class WikiCache:
             item.get()
             res['exists'] = True
             res['wikidata_id'] = item.id
-            res['uk_version'] = item.sitelinks.get('ukwiki')
+            res['uk_version'] = get_uk_version(item)
             return res
 
         page = pywikibot.Page(self.get_site(lang), title)
@@ -124,7 +127,7 @@ class WikiCache:
             try:
                 item = pywikibot.ItemPage.fromPage(redirect)
                 res['redirect_wikidata_id'] = item.id
-                res['redirect_uk_version'] = item.sitelinks.get('ukwiki')
+                res['redirect_uk_version'] = get_uk_version(item)
             except pywikibot.exceptions.NoPage:
                 pass
             res['redirect'] = redirect.title()
@@ -132,7 +135,7 @@ class WikiCache:
         try:
             item = pywikibot.ItemPage.fromPage(page)
             res['wikidata_id'] = item.id
-            res['uk_version'] = item.sitelinks.get('ukwiki')
+            res['uk_version'] = get_uk_version(item)
         except pywikibot.exceptions.NoPage:
             pass
 
@@ -178,7 +181,6 @@ class IwBot2:
             pass
 
     def run_mixed(self):
-
         def interrupt():
             self.wiki_cache.save()
             self.wiki_cache = WikiCache(filename=None) # temporarily ignore cache
@@ -194,13 +196,15 @@ class IwBot2:
             self.wiki_cache = WikiCache()
             self.processed_pages = slowly_processed | self.processed_pages
 
-        start = datetime.now()
-        for _ in self.run('search'):
-            if (datetime.now() - start) > timedelta(hours=8):
-                start = datetime.now()
-                interrupt()
         interrupt()
-        self.save_work()
+
+        start = datetime.now()
+        while True:
+            for _ in self.run('search'):
+                if (datetime.now() - start) > timedelta(hours=12):
+                    start = datetime.now()
+                    interrupt()
+            self.save_work()
 
     def save_work(self):
         self.wiki_cache.save()
