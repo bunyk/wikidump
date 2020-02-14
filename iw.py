@@ -102,7 +102,7 @@ class WikiCache:
             redirect_version=None,
         )
         def get_uk_version(item):
-            sl = item.sitelinks.get(sitename)
+            sl = item.sitelinks.get('ukwiki')
             if sl:
                 return sl.title
 
