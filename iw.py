@@ -101,7 +101,7 @@ class WikiCache:
             redirect_wikidata_id=None,
             redirect_version=None,
         )
-        def get_uk_version(item)
+        def get_uk_version(item):
             sl = item.sitelinks.get(sitename)
             if sl:
                 return sl.title
