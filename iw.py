@@ -491,9 +491,9 @@ def is_iw_tmpl(name):
 if __name__ == "__main__":
     print('lets go!')
     robot = IwBot2()
-    # robot.run_mixed()
+    robot.run_mixed()
     # title = 'Користувач:Bunyk/Чернетка'
     # title = 'PlayStation 4'
     # title = 'Літня універсіада 2019'
-    title = 'Шаблон:Пулітцерівська премія за вірші'
-    robot.process(pywikibot.Page(pywikibot.Site(), title))
+    # title = 'Шаблон:Пулітцерівська премія за вірші'
+    # robot.process(pywikibot.Page(pywikibot.Site(), title))
