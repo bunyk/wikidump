@@ -199,12 +199,11 @@ class IwBot2:
         interrupt()
 
         start = datetime.now()
-        while True:
-            for _ in self.run('search'):
-                if (datetime.now() - start) > timedelta(hours=12):
-                    start = datetime.now()
-                    interrupt()
-            self.save_work()
+        for _ in self.run('search'):
+            if (datetime.now() - start) > timedelta(hours=12):
+                start = datetime.now()
+                interrupt()
+        self.save_work()
 
     def save_work(self):
         self.wiki_cache.save()
@@ -265,14 +264,14 @@ class IwBot2:
                 summary.add('повідомлення про помилки вікіфікації')
 
         # avoid duplication of comments
-        new_text = re.sub(r'<!--(.+?)-->(<!--\1-->)+', r'<!--\1-->', new_text)
+        new_text = re.sub(r'<!--(.+?)\(BunykBot\)-->(<!--\1-->\(BunykBot\))+', r'<!--\1-->', new_text)
 
         if new_text == page.text:
             return
 
         # Do additional replacements
         new_text = re.sub(r'\[\[([^|]+)\|\1(\w*)]]', r'[[\1]]\2', new_text)
-        update_page(page, new_text, ', '.join(summary), yes=True)
+        update_page(page, new_text, ', '.join(summary), yes=False)
 
     def find_replacement(self, tmpl):
         """Return string to which template should be replaced, if it should
@@ -495,4 +494,5 @@ if __name__ == "__main__":
     robot.run_mixed()
     # title = 'Користувач:Bunyk/Чернетка'
     # title = 'PlayStation 4'
+    # title = 'Літня універсіада 2019'
     # robot.process(pywikibot.Page(pywikibot.Site(), title))
