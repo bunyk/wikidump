@@ -271,7 +271,7 @@ class IwBot2:
 
         # Do additional replacements
         new_text = re.sub(r'\[\[([^|]+)\|\1(\w*)]]', r'[[\1]]\2', new_text)
-        update_page(page, new_text, ', '.join(summary), yes=False)
+        update_page(page, new_text, ', '.join(summary), yes=True)
 
     def find_replacement(self, tmpl):
         """Return string to which template should be replaced, if it should
@@ -491,8 +491,9 @@ def is_iw_tmpl(name):
 if __name__ == "__main__":
     print('lets go!')
     robot = IwBot2()
-    robot.run_mixed()
+    # robot.run_mixed()
     # title = 'Користувач:Bunyk/Чернетка'
     # title = 'PlayStation 4'
     # title = 'Літня універсіада 2019'
-    # robot.process(pywikibot.Page(pywikibot.Site(), title))
+    title = 'Шаблон:Пулітцерівська премія за вірші'
+    robot.process(pywikibot.Page(pywikibot.Site(), title))
