@@ -1,6 +1,6 @@
 import mwparserfromhell
 
-from iw import get_params
+from iw import get_params, deduplicate_comments
 
 def parse_tmpl(text):
     code = mwparserfromhell.parse(text)
@@ -45,3 +45,8 @@ def test_get_params():
     assert text == 'Б'
     assert lang == 'en'
     assert external_title == 'B'
+
+
+def test_deduplicate_comments():
+    assert deduplicate_comments('<!-- Проблема вікіфікації: ggg (BunykBot)--><!-- Проблема вікіфікації: ggg (BunykBot)-->') == ( '<!-- Проблема вікіфікації: ggg (BunykBot)-->'
+    )

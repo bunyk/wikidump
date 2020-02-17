@@ -264,7 +264,7 @@ class IwBot2:
                 summary.add('повідомлення про помилки вікіфікації')
 
         # avoid duplication of comments
-        new_text = re.sub(r'<!--(.+?)\(BunykBot\)-->(<!--\1-->\(BunykBot\))+', r'<!--\1-->', new_text)
+        new_text = deduplicate_comments(new_text)
 
         if new_text == page.text:
             return
@@ -487,6 +487,9 @@ def confirmed(question):
 def is_iw_tmpl(name):
     n = name.strip()
     return (n[0].upper() + n[1:]) in IWTMPLS
+
+def deduplicate_comments(text):
+    return re.sub(r'<!--(.+?)\(BunykBot\)-->(<!--\1\(BunykBot\)-->)+', r'<!--\1(BunykBot)-->', text)
 
 if __name__ == "__main__":
     print('lets go!')
