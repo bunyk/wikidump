@@ -269,6 +269,8 @@ class IwBot2:
         if new_text == page.text:
             return
 
+        if not summary:
+            summary.add('виправлена вікіфікація')
         # Do additional replacements
         new_text = re.sub(r'\[\[([^|]+)\|\1(\w*)]]', r'[[\1]]\2', new_text)
         update_page(page, new_text, ', '.join(summary), yes=True)
