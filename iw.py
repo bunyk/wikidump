@@ -141,6 +141,12 @@ class WikiCache:
 
         return res
 
+NAMESPACES = [
+    0, # main
+    4, # Вікіпедія
+    10, # template
+]
+
 class IwBot2:
 
     def __init__(self):
@@ -160,12 +166,11 @@ class IwBot2:
         if method == "search":
             generator = itertools.chain(*[pagegenerators.SearchPageGenerator(
                 'insource:"{{' + name_form + '|"',
-                namespaces=[
-                    0, # main
-                    4, # Вікіпедія
-                    10, # template
-                ],
+                namespaces=NAMESPACES,
             ) for name_form in IWTMPLS + [n.lower() for n in IWTMPLS]])
+        if method == 'backlinks':
+            tmpl_p = pywikibot.Page(pywikibot.Site(), 'Шаблон:Не перекладено')
+            generator = tmpl_p.backlinks(namespaces=NAMESPACES)
         if method == "problems":
             generator = pagegenerators.SearchPageGenerator(
                 'insource:"}}<!-- Проблема вікіфікації"'

@@ -355,7 +355,6 @@ def fix_page(site, page):
 
     new_text = page.text
     code = mwparserfromhell.parse(page.text)
-    print(TEMPLATES_2_PROBLEMS.keys())
     problems = find_problems(code)
     if problems:
         print('\n'.join(problems))
