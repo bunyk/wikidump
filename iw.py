@@ -21,6 +21,7 @@ import mwparserfromhell
 
 from constants import LANGUAGE_CODES
 from turk import Turk
+import add_template_date
 
 IWTMPLS = ["Не перекладено", "Нп", "Iw", "Нп5", "Нп3", "Iw2", "НП5"]
 TITLE_EXCEPTIONS = [
@@ -200,11 +201,12 @@ class IwBot2:
 
             self.wiki_cache = WikiCache()
             self.processed_pages = slowly_processed | self.processed_pages
+            add_template_date.main()
 
         interrupt()
 
         start = datetime.now()
-        for _ in self.run('search'):
+        for _ in self.run('backlinks'):
             if (datetime.now() - start) > timedelta(hours=12):
                 start = datetime.now()
                 interrupt()

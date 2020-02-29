@@ -104,8 +104,6 @@ def add_en_cats(pagename):
             translate_category('en:' + cat.title(), 'Категорія:' + uk_cat)
 
 TODO = """
-Співмешкання
-Рівночасні обчислення
 Robot Operating System
 Арон Галфейкер
 Синдром студента
