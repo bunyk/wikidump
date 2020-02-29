@@ -171,7 +171,7 @@ class IwBot2:
             ) for name_form in IWTMPLS + [n.lower() for n in IWTMPLS]])
         if method == 'backlinks':
             tmpl_p = pywikibot.Page(pywikibot.Site(), 'Шаблон:Не перекладено')
-            generator = tmpl_p.backlinks(namespaces=NAMESPACES)
+            generator = tmpl_p.getReferences(namespaces=NAMESPACES, only_template_inclusion=True)
         if method == "problems":
             generator = pagegenerators.SearchPageGenerator(
                 'insource:"}}<!-- Проблема вікіфікації"'
