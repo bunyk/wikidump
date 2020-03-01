@@ -23,7 +23,7 @@ from constants import LANGUAGE_CODES
 from turk import Turk
 import add_template_date
 
-IWTMPLS = ["Не перекладено", "Нп", "Iw", "Нп5", "Нп3", "Iw2", "НП5"]
+IWTMPLS = ["Не_перекладено", "Не перекладено", "Нп", "Iw", "Нп5", "Нп3", "Iw2", "НП5"]
 TITLE_EXCEPTIONS = [
 #     "Користувач:",
     # "Вікіпедія:Кнайпа",
@@ -176,6 +176,7 @@ class IwBot2:
             generator = pagegenerators.SearchPageGenerator(
                 'insource:"}}<!-- Проблема вікіфікації"'
             )
+            self.problems = {}
         try:
             for page in generator:
                 try:
@@ -248,7 +249,6 @@ class IwBot2:
         new_text = re.sub(r'<!-- Проблема вікіфікації: .+? \(BunykBot\)-->', '', new_text)
         code = mwparserfromhell.parse(new_text)
         summary = set()
-        self.problems[page.title()] = [] # clear problems
         for tmpl in code.filter_templates():
             if not is_iw_tmpl(tmpl.name):
                 continue
@@ -505,7 +505,6 @@ if __name__ == "__main__":
     robot = IwBot2()
     robot.run_mixed()
     # title = 'Користувач:Bunyk/Чернетка'
-    # title = 'PlayStation 4'
-    # title = 'Літня універсіада 2019'
-    # title = 'Шаблон:Пулітцерівська премія за вірші'
+    title = 'Вікіпедія:WikiScience Contest 2019/Фізика'
+    title = 'The Sound of Silence'
     # robot.process(pywikibot.Page(pywikibot.Site(), title))
