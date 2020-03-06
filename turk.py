@@ -13,6 +13,14 @@ class Turk:
 
     def save(self):
         """ Save answers data to file """
+
+        # But preserve what was already answered there
+        with open(filename) as f:
+            old_answers = json.load(f)
+        for question, data in old_answers.items():
+            if data.get('answer') is not None:
+                self.answers[question]['answer'] = data['answer']
+
         with open(self.filename, 'w', encoding='utf8') as f:
             json.dump(self.answers, f, indent=' ', ensure_ascii=False)
 

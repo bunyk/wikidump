@@ -247,11 +247,8 @@ class IwBot2:
         self.processed_pages.add(page.title())
         new_text = page.text
         new_text = re.sub(r'<!-- Проблема вікіфікації: .+? \(BunykBot\)-->', '', new_text)
-        code = mwparserfromhell.parse(new_text)
         summary = set()
-        for tmpl in code.filter_templates():
-            if not is_iw_tmpl(tmpl.name):
-                continue
+        for tmpl in iw_templates(new_text):
             replacement = False
             problem = False
             try:
@@ -306,6 +303,8 @@ class IwBot2:
             else:
                 return None # this is not a big deal, maybe they will create it before us
 
+        print('here:', here)
+        print('there:', there)
         if here['exists']:
             if (
                 (here['wikidata_id'] is not None)
@@ -421,6 +420,10 @@ class IwBot2:
         )
         return probl
 
+LANGUAGE_MAPPINGS = dict( # common language code mistakes
+    cz="cs",
+    jp="ja",
+)
 def get_params(tmpl):
     """Return values of params for iw template"""
 
@@ -456,6 +459,8 @@ def get_params(tmpl):
         lang = "en"
     if not external_title:
         external_title = uk_title
+
+    lang = LANGUAGE_MAPPINGS.get(lang, lang)
 
     return uk_title, text, lang.lower(), external_title
 
@@ -497,14 +502,33 @@ def is_iw_tmpl(name):
     n = name.strip()
     return (n[0].upper() + n[1:]) in IWTMPLS
 
+def iw_templates(text):
+    code = mwparserfromhell.parse(text)
+    for tmpl in code.filter_templates():
+        if is_iw_tmpl(tmpl.name):
+            yield tmpl
+
+    for tag in code.filter_tags():
+        if str(tag.tag) != 'gallery':
+            continue
+
+        for l in str(tag.contents).splitlines():
+            if not l.strip():
+                continue
+            if not '|' in l:
+                continue
+            _, desc = l.split('|', 1)
+            yield from iw_templates(desc)
+
 def deduplicate_comments(text):
     return re.sub(r'<!--(.+?)\(BunykBot\)-->(<!--\1\(BunykBot\)-->)+', r'<!--\1(BunykBot)-->', text)
 
 if __name__ == "__main__":
     print('lets go!')
     robot = IwBot2()
-    robot.run_mixed()
+    # robot.run_mixed()
     # title = 'Користувач:Bunyk/Чернетка'
     title = 'Вікіпедія:WikiScience Contest 2019/Фізика'
-    title = 'The Sound of Silence'
-    # robot.process(pywikibot.Page(pywikibot.Site(), title))
+    title = 'Ацетилювання'
+    # title = 'The Sound of Silence'
+    robot.process(pywikibot.Page(pywikibot.Site(), title))
