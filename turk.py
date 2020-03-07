@@ -15,7 +15,7 @@ class Turk:
         """ Save answers data to file """
 
         # But preserve what was already answered there
-        with open(filename) as f:
+        with open(self.filename) as f:
             old_answers = json.load(f)
         for question, data in old_answers.items():
             if data.get('answer') is not None:
