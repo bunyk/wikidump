@@ -100,7 +100,7 @@ class WikiCache:
             wikidata_id=None,
             uk_version=None,
             redirect_wikidata_id=None,
-            redirect_version=None,
+            redirect_uk_version=None,
         )
         def get_uk_version(item):
             sl = item.sitelinks.get('ukwiki')
@@ -303,8 +303,6 @@ class IwBot2:
             else:
                 return None # this is not a big deal, maybe they will create it before us
 
-        print('here:', here)
-        print('there:', there)
         if here['exists']:
             if (
                 (here['wikidata_id'] is not None)
@@ -526,9 +524,7 @@ def deduplicate_comments(text):
 if __name__ == "__main__":
     print('lets go!')
     robot = IwBot2()
-    # robot.run_mixed()
+    robot.run_mixed()
     # title = 'Користувач:Bunyk/Чернетка'
     title = 'Вікіпедія:WikiScience Contest 2019/Фізика'
-    title = 'Ацетилювання'
-    # title = 'The Sound of Silence'
     robot.process(pywikibot.Page(pywikibot.Site(), title))
