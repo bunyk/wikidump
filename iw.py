@@ -36,6 +36,8 @@ TITLE_EXCEPTIONS = [
 ]
 
 REPLACE_SUMMARY = "[[User:PavloChemBot/Iw|автоматична заміна]] {{[[Шаблон:Не перекладено|Не перекладено]]}} вікі-посиланнями на перекладені статті"
+
+ERROR_REPORT_TITLE = 'Користувач:BunykBot/Сторінки з неправильно використаним шаблоном "Не перекладено"'
 TIME_FORMAT = "%d.%m.%Y, %H:%M:%S"
 
 class IwExc(Exception):
@@ -54,20 +56,7 @@ class WikiCache:
 
     def __init__(self, filename='cache.json'):
         self.sites = dict(d=pywikibot.Site("wikidata", "wikidata"))
-        self.filename = filename
-        try:
-            if not filename:
-                raise FileNotFoundError
-            with open(filename) as f:
-                self.cache = json.load(f)
-        except FileNotFoundError:
-            self.cache = dict() # we will save it later
-
-    def save(self):
-        if not self.filename:
-            return
-        with open(self.filename, 'w', encoding='utf8') as f:
-            json.dump(self.cache, f, indent=' ', ensure_ascii=False)
+        self.cache = dict()
 
     def get_site(self, lang):
         """Get site by language"""
@@ -77,21 +66,15 @@ class WikiCache:
 
     def get_page_and_wikidata(self, lang, title):
         key = lang + ':' + title
-        if (
-            (key in self.cache) and
-            (datetime.strptime(
-                self.cache[key]['till'],
-                TIME_FORMAT
-            ) >= datetime.now())
-        ):
-            return self.cache[key]['val']
+        if key in self.cache:
+            return self.cache[key]
 
         res = self._fetch_page_and_wikidata(lang, title)
-        self.cache[key] = dict(
-            val=res,
-            till=(datetime.now() + timedelta(days=7 if res['exists'] else 1)).strftime(TIME_FORMAT)
-        )
+        self.cache[key] = res
         return res
+
+    def clear(self):
+        self.cache.clear()
 
     def _fetch_page_and_wikidata(self, lang, title):
         res = dict(
@@ -173,9 +156,7 @@ class IwBot2:
             tmpl_p = pywikibot.Page(pywikibot.Site(), 'Шаблон:Не перекладено')
             generator = tmpl_p.getReferences(namespaces=NAMESPACES, only_template_inclusion=True)
         if method == "problems":
-            generator = pagegenerators.SearchPageGenerator(
-                'insource:"}}<!-- Проблема вікіфікації"'
-            )
+            generator = list_problem_pages()
             self.problems = {}
         try:
             for page in generator:
@@ -189,18 +170,16 @@ class IwBot2:
 
     def run_mixed(self):
         def interrupt():
-            self.wiki_cache.save()
-            self.wiki_cache = WikiCache(filename=None) # temporarily ignore cache
+            self.wiki_cache.clear()
             slowly_processed = self.processed_pages
             self.processed_pages = set()
 
-            for _ in self.run('category'):
-                pass
             for _ in self.run('problems'):
+                pass
+            for _ in self.run('category'):
                 pass
             self.update_problems()
 
-            self.wiki_cache = WikiCache()
             self.processed_pages = slowly_processed | self.processed_pages
             add_template_date.main()
 
@@ -214,7 +193,6 @@ class IwBot2:
         self.save_work()
 
     def save_work(self):
-        self.wiki_cache.save()
         self.turk.save()
 
         print(len(self.processed_pages), "pages were processed")
@@ -227,10 +205,7 @@ class IwBot2:
         self.update_problems()
 
     def update_problems(self):
-        page = pywikibot.Page(
-            pywikibot.Site(),
-            'Користувач:BunykBot/Сторінки з неправильно використаним шаблоном "Не перекладено"',
-        )
+        page = pywikibot.Page(pywikibot.Site(), ERROR_REPORT_TITLE)
         update_page(page, self.format_problems(), 'Автоматичне оновлення таблиць', yes=True)
 
 
@@ -520,6 +495,21 @@ def iw_templates(text):
 
 def deduplicate_comments(text):
     return re.sub(r'<!--(.+?)\(BunykBot\)-->(<!--\1\(BunykBot\)-->)+', r'<!--\1(BunykBot)-->', text)
+
+
+def list_problem_pages():
+    pp = pywikibot.Page(pywikibot.Site(), ERROR_REPORT_TITLE)
+    titles = re.findall(r'^\| (?:rowspan="\d+" \| )?\[\[([^\]]+)]]', pp.text, re.M)
+    for title in titles:
+        yield pywikibot.Page(pywikibot.Site(), title)
+
+    for p in pagegenerators.SearchPageGenerator(
+        'insource:"}}<!-- Проблема вікіфікації"'
+    ):
+        if page.title() not in titles:
+            yield page
+
+
 
 if __name__ == "__main__":
     print('lets go!')

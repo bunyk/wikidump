@@ -6,6 +6,8 @@ import pywikibot
 from pywikibot import pagegenerators
 import mwparserfromhell
 
+from constants import MONTHS_GENITIVE, MONTHS
+
 PROBLEM_TEMPLATES = {
     'проблеми',
     'недоліки',
@@ -481,34 +483,6 @@ def get_category_name_for_date(category_name, timestamp):
 def get_template_date_for(timestamp):
     return MONTHS[timestamp.month - 1] + ' ' + str(timestamp.year)
 
-MONTHS_GENITIVE = [
-    'січня',
-    'лютого',
-    'березня',
-    'квітня',
-    'травня',
-    'червня',
-    'липня',
-    'серпня',
-    'вересня',
-    'жовтня',
-    'листопада',
-    'грудня',
-]
-MONTHS = [
-    'січень',
-    'лютий',
-    'березень',
-    'квітень',
-    'травень',
-    'червень',
-    'липень',
-    'серпень',
-    'вересень',
-    'жовтень',
-    'листопад',
-    'грудень'
-]
 
 if __name__ == "__main__":
     main()

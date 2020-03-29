@@ -1,4 +1,5 @@
 import pywikibot
+import turk
 
 site = pywikibot.Site()
 
@@ -92,6 +93,9 @@ def add_en_cats(pagename):
         return
     enpage = pywikibot.Page(site, 'en:'+entitle)
     for cat in reversed(list(enpage.categories())):
+        if cat.title().startswith('Category:Wikipedia articles '):
+            print("Skip", cat)
+            continue
         uk_cat = get_uk_version(cat)
         if not uk_cat:
             uk_cat = input(f'Як перекласти {cat.title()}?')
@@ -104,9 +108,11 @@ def add_en_cats(pagename):
             translate_category('en:' + cat.title(), 'Категорія:' + uk_cat)
 
 TODO = """
-Robot Operating System
-Арон Галфейкер
-Синдром студента
+Річард Беллман
+Фред Брукс
+Карл Девід Андерсон
+Rust (мова програмування)
+Сід Меєр
 """
 
 
@@ -114,6 +120,7 @@ def main():
     for pn in TODO.splitlines():
         if pn.strip():
             add_en_cats(pn.strip())
+    turk.save()
 
 if __name__ == "__main__":
     main()
