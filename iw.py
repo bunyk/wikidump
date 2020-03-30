@@ -503,7 +503,7 @@ def list_problem_pages():
     for title in titles:
         yield pywikibot.Page(pywikibot.Site(), title)
 
-    for p in pagegenerators.SearchPageGenerator(
+    for page in pagegenerators.SearchPageGenerator(
         'insource:"}}<!-- Проблема вікіфікації"'
     ):
         if page.title() not in titles:
