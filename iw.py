@@ -337,11 +337,11 @@ class IwBot2:
         self.problems[page_title].append(message)
         print("\t>>> " + message)
 
-    def format_top(self):
-        top = '100 найпотрібніших перекладів:\n'
+    def format_top(self, n=500):
+        top = str(n) + ' найпотрібніших перекладів:\n'
         top += '{| class="standard sortable"\n'
         top += "! Сторінка до перекладу || N\n"
-        for page, n in self.to_translate.most_common(100):
+        for page, n in self.to_translate.most_common(n):
             top += '|-\n| [[:%s:%s]] || %d\n' % (page[0], page[1], n)
         top += "|}"
         return top

@@ -41,6 +41,7 @@ LANGUAGE_CODES = set([
     "he",
     "lt",
     "hy",
+    "hyw",
     "hr",
     "sl",
     "et",
