@@ -108,11 +108,7 @@ def add_en_cats(pagename):
             translate_category('en:' + cat.title(), 'Категорія:' + uk_cat)
 
 TODO = """
-Річард Беллман
-Фред Брукс
-Карл Девід Андерсон
-Rust (мова програмування)
-Сід Меєр
+Ґуд бай, Ленін!
 """
 
 

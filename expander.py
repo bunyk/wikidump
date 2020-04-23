@@ -1,6 +1,7 @@
 from datetime import datetime
 import re
 import io
+import sys
 
 import requests
 import lxml.html
@@ -8,77 +9,91 @@ import pywikibot
 
 from constants import MONTHS_GENITIVE
 
-url_regexp = r'\[?(https?://(?:[\w_-]+(?:(?:\.[\w_-]+)+))(?:[\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?)\]?'
+url_regexp = r'\[?(?P<url>https?://(?:[\w_-]+(?:(?:\.[\w_-]+)+))(?:[\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?)\]?'
+
+def get_meta(tree, selector, attribute='content'):
+    m = tree.find('//meta[%s]' % selector)
+    print('property', selector, m)
+    if m is None:
+        return ''
+    print(m.attrib)
+    return m.attrib.get(attribute, '')
+
+def get_og_property(tree, name):
+    return get_meta(tree, '@property="og:%s"' % name)
 
 def metadata(url):
     resp = requests.get(url)
     t = lxml.html.parse(io.StringIO(resp.text))
-    return dict(
-        title = t.find(".//title").text.strip()
+    return Fields(
+        title = get_og_property(t, 'title') or t.find(".//title").text.strip(),
+        site = get_og_property(t, 'site_name'),
+        author = get_meta(t, '@name="author"'),
     )
 
+class Fields:
+    def __init__(self, **kwargs):
+        self.data = kwargs
+
+    def __getattr__(self, name):
+        return self.data[name].replace('|', '{{!}}')
+
 def expand_url(match):
-    url = None
-    for g in match.groups():
-        if g:
-            url = g
+    url = match.group('url')
     assert url
     m = metadata(url)
     now = datetime.now()
     today = f'{now.day} {MONTHS_GENITIVE[now.month - 1]} {now.year}'
 
-    return f'''{{{{cite web
+    return match.group(0).replace(url, f'''{{{{cite web
  |url          = {url}
- |назва        = {m['title']} <!-- заголовок згенерований ботом -->
- |прізвище     =
- |ім'я         =
+ |назва        = {m.title} <!-- заголовок згенерований ботом -->
+ |автор        = {m.author}
  |дата         =
- |веб-сайт     =
+ |веб-сайт     = {m.site}
  |видавець     =
  |дата-доступу = {today}
-}}}}'''
+}}}}''')
 
 def templetify_links(text):
-    raw_urls = rf'^\* {url_regexp}$|<ref>{url_regexp}</ref>'
-    return re.sub(raw_urls, expand_url, text, flags=re.M)
+    def templetify_context(context):
+        nonlocal text
+        text = re.sub(context, expand_url, text, flags=re.M)
+
+    templetify_context(rf'^\* {url_regexp}$')
+    templetify_context(rf'<ref(?: name=.+?)?>{url_regexp}</ref>')
+    return text
 
 def expand_page(page):
     page.text = templetify_links(page.text)
     page.save('оформлення')
 
 def main():
-    site = pywikibot.Site()
-    page = pywikibot.Page(site, 'Туалетний папір')
-    expand_page(page)
-    # expanded = templetify_links(text)
-    # print(expanded)
+    TEST = False
+    if not TEST:
+        site = pywikibot.Site()
+        page = pywikibot.Page(site, sys.argv[1])
+        expand_page(page)
+    else:
+        expanded = templetify_links(text)
+        print(expanded)
 
 
-text = '''
-{{Infobox programming language
-| latest_release_date = {{Дата релізу та вік|2019|12|15|df=yes}}<ref>{{cite web |url= https://code.jsoftware.com/wiki/System/ReleaseNotes/J901 |title= J901 release 15 December 2019}}</ref>
-| typing = [[Система типізації#Динамічна типізація|динамічна]]
-| influenced = [[NumPy]]<ref name="Python for Data Analysis">[http://traims.tumblr.com/post/33883718232/python-for-data-analysis-18-oct-2012-london Wes McKinney at 2012 meeting Python for Data Analysis]</ref><br/>[[SuperCollider]]<ref name="SuperCollider documentation">[http://doc.sccode.org/Reference/Adverbs.html SuperCollider documentation, Adverbs for Binary Operators]</ref>
-| operating_system = [[Багатоплатформність]]: [[Microsoft Windows]], [[Linux]], [[macOS]]
-| license = [[GNU General Public License|GPLv3]]
-| website = {{URL|www.jsoftware.com}}
-}}
+text = """
+== Зноски ==
+<references>
+<ref name="spotify">https://developer.spotify.com/documentation/web-api/reference/tracks/get-audio-features/</ref>
+<ref name="qz">https://qz.com/1331549/these-are-the-best-songs-to-dance-to-according-to-computer-science/</ref>
+</references>
 
-== Приклади ==
-Отако виглядає код [[Життя (гра)|гри "Життя"]] на J<ref>https://copy.sh/jlife/</ref>:
+== Література ==
+*{{МД}}
 
-Для порівняння, так виглядає аналогічний код на [[APL]]<ref>https://dfns.dyalog.com/c_life.htm</ref>:
+{{music-stub}} 
+{{Ізольована стаття}}
 
-
-== Примітки ==
-{{reflist|2}}
-
-* http://bunyk.wordpress.com/about
-* [http://bunyk.wordpress.com/about]
-
-== Посилання ==
-*{{Official website|www.jsoftware.com}} {{ref-en}}
-'''
+[[Категорія:Музичні терміни]]
+"""
 
 if __name__ == '__main__':
     main()
