@@ -139,6 +139,7 @@ class IwBot2:
         self.processed_pages = set()
         self.turk = Turk()
         self.to_translate = Counter()
+        self.bold = False
 
     def run(self, method='search'):
         if method == "category":
@@ -167,6 +168,12 @@ class IwBot2:
                 yield 
         except KeyboardInterrupt:
             pass
+
+    def run_bold(self):
+        self.bold = True # solve problems boldly
+        for _ in self.run('problems'):
+            pass
+        self.save_work()
 
     def run_mixed(self):
         def interrupt():
@@ -237,7 +244,10 @@ class IwBot2:
 
             if replacement:
                 new_text = new_text.replace(str(tmpl), replacement)
-                summary.add(REPLACE_SUMMARY)
+                if self.bold:
+                    summary.add('прибирання мертвих посилань')
+                else:
+                    summary.add(REPLACE_SUMMARY)
             if problem:
                 new_text = new_text.replace(str(tmpl), problem)
                 summary.add('повідомлення про помилки вікіфікації')
@@ -266,12 +276,18 @@ class IwBot2:
             raise IwExc("Шаблон %s не має параметра з назвою сторінки" % tmpl)
 
         there = self.wiki_cache.get_page_and_wikidata(lang, external_title)
+        here = self.wiki_cache.get_page_and_wikidata('uk', uk_title)
         if not there['exists']:
+            if self.bold:
+                if here['exists']:
+                    return f'[[{uk_title}|{text}]]'
+                else:
+                    return text
+
             raise IwExc(f"Не знайдено сторінки [[:{lang}:{external_title}]]")
 
         self.to_translate.update([(lang, external_title)])
 
-        here = self.wiki_cache.get_page_and_wikidata('uk', uk_title)
         if not (there['wikidata_id'] or there['redirect_wikidata_id']):
             if here['exists']:
                 raise IwExc(f"Сторінка [[:{lang}:{external_title}]] не має пов'язаного елемента вікіданих")
@@ -514,7 +530,9 @@ def list_problem_pages():
 if __name__ == "__main__":
     print('lets go!')
     robot = IwBot2()
+    # robot.run_bold()
     robot.run_mixed()
+
     # title = 'Користувач:Bunyk/Чернетка'
     title = 'Вікіпедія:WikiScience Contest 2019/Фізика'
-    robot.process(pywikibot.Page(pywikibot.Site(), title))
+    # robot.process(pywikibot.Page(pywikibot.Site(), title))
