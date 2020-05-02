@@ -356,6 +356,9 @@ def fix_page(site, page):
     print(page.title())
 
     new_text = page.text
+    if len(new_text) > 200000:
+        print('Skipped as page is to large')
+        return
     code = mwparserfromhell.parse(page.text)
     problems = find_problems(code)
     if problems:
