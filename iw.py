@@ -261,7 +261,7 @@ class IwBot2:
         if not summary:
             summary.add('виправлена вікіфікація')
         # Do additional replacements
-        new_text = re.sub(r'\[\[([^|]+)\|\1(\w*)]]', r'[[\1]]\2', new_text)
+        new_text = re.sub(r'\[\[([^|\d]+)\|\1([^\W\d]*)]]', r'[[\1]]\2', new_text)
         update_page(page, new_text, ', '.join(summary), yes=True)
 
     def find_replacement(self, tmpl):
