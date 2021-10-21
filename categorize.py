@@ -76,7 +76,7 @@ def get_uk_articles(cat):
 def get_translation(page, lang):
     try:
         item = pywikibot.ItemPage.fromPage(page)
-    except pywikibot.exceptions.NoPage as e:
+    except pywikibot.exceptions.NoPageError as e:
         return
     sl = item.sitelinks.get(lang+'wiki')
     if sl:
