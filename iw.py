@@ -112,7 +112,7 @@ class WikiCache:
                 item = pywikibot.ItemPage.fromPage(redirect)
                 res['redirect_wikidata_id'] = item.id
                 res['redirect_uk_version'] = get_uk_version(item)
-            except pywikibot.exceptions.NoPage:
+            except pywikibot.exceptions.NoPageError:
                 pass
             res['redirect'] = redirect.title()
 
@@ -120,7 +120,7 @@ class WikiCache:
             item = pywikibot.ItemPage.fromPage(page)
             res['wikidata_id'] = item.id
             res['uk_version'] = get_uk_version(item)
-        except pywikibot.exceptions.NoPage:
+        except pywikibot.exceptions.NoPageError:
             pass
 
         return res
