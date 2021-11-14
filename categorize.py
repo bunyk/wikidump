@@ -1,7 +1,23 @@
-import pywikibot
-import turk
+'''
+Adds categories to list of pages, by looking which categories are used for en versions
+of the same page.
 
-site = pywikibot.Site()
+For every added category, check which pages are in en version of the category,
+and add all the existing uk pages to that category.
+'''
+import pywikibot
+
+TODO = """
+Аугустус де Морган
+Нед Ладд
+"""
+
+def main():
+    for pn in TODO.splitlines():
+        if pn.strip():
+            add_en_cats(pn.strip())
+
+site = pywikibot.Site('uk', 'wikipedia')
 
 def translate_category(pagename, uk_title):
     if isprefixed(uk_title,
@@ -77,6 +93,7 @@ def get_translation(page, lang):
     try:
         item = pywikibot.ItemPage.fromPage(page)
     except pywikibot.exceptions.NoPageError as e:
+        print('Not found', page)
         return
     sl = item.sitelinks.get(lang+'wiki')
     if sl:
@@ -106,17 +123,6 @@ def add_en_cats(pagename):
             uk_cat = uk_cat[len('Категорія:'):]
         if uk_cat:
             translate_category('en:' + cat.title(), 'Категорія:' + uk_cat)
-
-TODO = """
-Ґуд бай, Ленін!
-"""
-
-
-def main():
-    for pn in TODO.splitlines():
-        if pn.strip():
-            add_en_cats(pn.strip())
-    turk.save()
 
 if __name__ == "__main__":
     main()

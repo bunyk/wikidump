@@ -1,3 +1,10 @@
+'''
+python3 expander.py $PAGE_NAME 
+
+will expand links in wikipedia page using templates. Example:
+
+https://uk.wikipedia.org/w/index.php?title=%D0%A2%D0%B0%D0%BD%D1%86%D1%8E%D0%B2%D0%B0%D0%BB%D1%8C%D0%BD%D1%96%D1%81%D1%82%D1%8C&type=revision&diff=27777964&oldid=27777749
+'''
 from datetime import datetime
 import re
 import io
@@ -8,6 +15,24 @@ import lxml.html
 import pywikibot
 
 from constants import MONTHS_GENITIVE
+
+def main():
+    site = pywikibot.Site()
+    page = pywikibot.Page(site, sys.argv[1])
+
+    page.text = templetify_links(page.text)
+    page.save('оформлення')
+
+now = datetime.now()
+
+def templetify_links(text):
+    def templetify_context(context):
+        nonlocal text
+        text = re.sub(context, expand_url, text, flags=re.M)
+
+    templetify_context(rf'^\* {url_regexp}$')
+    templetify_context(rf'<ref(?: name=.+?)?>{url_regexp}</ref>')
+    return text
 
 url_regexp = r'\[?(?P<url>https?://(?:[\w_-]+(?:(?:\.[\w_-]+)+))(?:[\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?)\]?'
 
@@ -42,7 +67,6 @@ def expand_url(match):
     url = match.group('url')
     assert url
     m = metadata(url)
-    now = datetime.now()
     today = f'{now.day} {MONTHS_GENITIVE[now.month - 1]} {now.year}'
 
     return match.group(0).replace(url, f'''{{{{cite web
@@ -55,45 +79,7 @@ def expand_url(match):
  |дата-доступу = {today}
 }}}}''')
 
-def templetify_links(text):
-    def templetify_context(context):
-        nonlocal text
-        text = re.sub(context, expand_url, text, flags=re.M)
 
-    templetify_context(rf'^\* {url_regexp}$')
-    templetify_context(rf'<ref(?: name=.+?)?>{url_regexp}</ref>')
-    return text
-
-def expand_page(page):
-    page.text = templetify_links(page.text)
-    page.save('оформлення')
-
-def main():
-    TEST = False
-    if not TEST:
-        site = pywikibot.Site()
-        page = pywikibot.Page(site, sys.argv[1])
-        expand_page(page)
-    else:
-        expanded = templetify_links(text)
-        print(expanded)
-
-
-text = """
-== Зноски ==
-<references>
-<ref name="spotify">https://developer.spotify.com/documentation/web-api/reference/tracks/get-audio-features/</ref>
-<ref name="qz">https://qz.com/1331549/these-are-the-best-songs-to-dance-to-according-to-computer-science/</ref>
-</references>
-
-== Література ==
-*{{МД}}
-
-{{music-stub}} 
-{{Ізольована стаття}}
-
-[[Категорія:Музичні терміни]]
-"""
 
 if __name__ == '__main__':
     main()

@@ -1,3 +1,25 @@
+'''
+Mechanical Turk is a simple way to add human intelligence to your programs, if you
+are not able to implement good enough artificial intelligence.
+
+First you instantiate turk with turk = Turk(). It will load
+its knowledge from the memory file ('turk.json' bo default), if such exists.
+
+Every time your program needs to make some decision, it lacks sufficient intelligence for
+it will call, for example:
+
+turk.answer('%s is name of' % name, 'man', 'woman', 'not sure')
+
+If answer was given earlier, it will return the answer. If not - record the question, and return none.
+Having none, your program should do some action for default decision. Maybe postpone doing some action
+until the answer is given.
+
+Running this module as a script (`python3 turk.py`) will load the questions and will
+ask user about them. Answers of user are recorded, so next run of program that 
+needs intelligence, will use answers that were given.
+
+TODO: add command line argument to select memory file.
+'''
 import json
 
 class Turk:
