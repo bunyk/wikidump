@@ -1,6 +1,7 @@
 import mwparserfromhell
 
 from iw import get_params, deduplicate_comments
+from constants import BOT_NAME
 
 def parse_tmpl(text):
     code = mwparserfromhell.parse(text)
@@ -48,5 +49,5 @@ def test_get_params():
 
 
 def test_deduplicate_comments():
-    assert deduplicate_comments('<!-- Проблема вікіфікації: ggg (BunykBot)--><!-- Проблема вікіфікації: ggg (BunykBot)-->') == ( '<!-- Проблема вікіфікації: ggg (BunykBot)-->'
+    assert deduplicate_comments(f'<!-- Проблема вікіфікації: ggg ({BOT_NAME})--><!-- Проблема вікіфікації: ggg ({BOT_NAME})-->') == ( f'<!-- Проблема вікіфікації: ggg ({BOT_NAME})-->'
     )

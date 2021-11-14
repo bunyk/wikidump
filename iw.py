@@ -19,7 +19,7 @@ import pywikibot
 from pywikibot import pagegenerators, Bot
 import mwparserfromhell
 
-from constants import LANGUAGE_CODES
+from constants import LANGUAGE_CODES, BOT_NAME
 from turk import Turk
 import add_template_date
 
@@ -37,7 +37,7 @@ TITLE_EXCEPTIONS = [
 
 REPLACE_SUMMARY = "[[User:PavloChemBot/Iw|автоматична заміна]] {{[[Шаблон:Не перекладено|Не перекладено]]}} вікі-посиланнями на перекладені статті"
 
-ERROR_REPORT_TITLE = 'Користувач:BunykBot/Сторінки з неправильно використаним шаблоном "Не перекладено"'
+ERROR_REPORT_TITLE = f'Користувач:{BOT_NAME}/Сторінки з неправильно використаним шаблоном "Не перекладено"'
 TIME_FORMAT = "%d.%m.%Y, %H:%M:%S"
 
 class IwExc(Exception):
@@ -206,7 +206,7 @@ class IwBot2:
 
         page = pywikibot.Page(
             pywikibot.Site(),
-            'Користувач:BunykBot/Найпотрібніші переклади',
+            f'Користувач:{BOT_NAME}/Найпотрібніші переклади',
         )
         update_page(page, self.format_top(), 'Автоматичне оновлення таблиць', yes=True)
         self.update_problems()
@@ -228,7 +228,7 @@ class IwBot2:
             return
         self.processed_pages.add(page.title())
         new_text = page.text
-        new_text = re.sub(r'<!-- Проблема вікіфікації: .+? \(BunykBot\)-->', '', new_text)
+        new_text = re.sub(rf'<!-- Проблема вікіфікації: .+? \({BOT_NAME}\)-->', '', new_text)
         summary = set()
         for tmpl in iw_templates(new_text):
             replacement = False
@@ -237,7 +237,7 @@ class IwBot2:
                 replacement = self.find_replacement(tmpl)
             except IwExc as e:
                 self.add_problem(page, e.message)
-                problem = str(tmpl) + '<!-- Проблема вікіфікації: ' + e.message + ' (BunykBot)-->'
+                problem = str(tmpl) + '<!-- Проблема вікіфікації: ' + e.message + f' ({BOT_NAME})-->'
             except Exception as e:
                 traceback.print_exc()
                 self.add_problem(page, "Неочікувана помилка (%s %s) при роботі з шаблоном %s" % (type(e), e, tmpl))
@@ -510,7 +510,7 @@ def iw_templates(text):
             yield from iw_templates(desc)
 
 def deduplicate_comments(text):
-    return re.sub(r'<!--(.+?)\(BunykBot\)-->(<!--\1\(BunykBot\)-->)+', r'<!--\1(BunykBot)-->', text)
+    return re.sub(rf'<!--(.+?)\({BOT_NAME}\)-->(<!--\1\({BOT_NAME}\)-->)+', rf'<!--\1({BOT_NAME})-->', text)
 
 
 def list_problem_pages():

@@ -1,3 +1,5 @@
+BOT_NAME = 'SashkoR0B0T'
+
 LANGUAGE_CODES = set([
     "en",
     "eu",
