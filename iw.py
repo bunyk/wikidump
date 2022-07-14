@@ -23,7 +23,6 @@ from constants import LANGUAGE_CODES, BOT_NAME
 def main():
     print("lets go!")
     robot = IwBot(search_backlog())
-    # robot = IwBot(list_problem_pages())
     robot.run()
 
     # title = 'Користувачка:Ата/географія'
@@ -212,7 +211,6 @@ class IwBot:
         with open(HIBERNATE_FILE, "w") as f:
             state = dict(
                 backlog=self.backlog,
-                problems=self.problems,
                 to_translate=self.to_translate,
                 cursor=self.cursor,
             )
@@ -224,7 +222,6 @@ class IwBot:
                 data = json.load(f)
                 self.backlog = data["backlog"]
                 self.to_translate = Counter(data["to_translate"])
-                self.problems = data["problems"]
                 self.cursor = data["cursor"]
             return True
         except Exception:
@@ -250,10 +247,11 @@ class IwBot:
         ):
             return  # updated problems not so far ago
         self.wiki_cache.clear()
+        self.problems = {}
 
-        problems = order_backlog(list_problem_pages())
-        for i, title in enumerate(problems):
-            self.process_step(title, i, len(problems))
+        problem_titles = order_backlog(list_problem_pages())
+        for i, title in enumerate(problem_titles):
+            self.process_step(title, i, len(problem_titles))
         self.update_problems()
 
     def process_step(self, title, i, total):
