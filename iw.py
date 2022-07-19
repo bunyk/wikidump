@@ -25,7 +25,7 @@ def main():
     robot = IwBot(search_backlog())
     robot.run()
 
-    # title = 'Користувачка:Ата/географія'
+    # title = 'Війна за незалежність США'
     # robot.process(pywikibot.Page(SITE, title))
 
 
@@ -294,7 +294,7 @@ class IwBot:
                 return
         new_text = page.text
         new_text = re.sub(
-            rf"<!-- Проблема вікіфікації: .+? \({BOT_NAME}\)-->", "", new_text
+            rf"<!-- Проблема вікіфікації: .+?-->", "", new_text
         )
         summary = set()
         for tmpl in iw_templates(new_text):
