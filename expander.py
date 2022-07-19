@@ -17,7 +17,7 @@ import pywikibot
 from constants import MONTHS_GENITIVE
 
 def main():
-    site = pywikibot.Site()
+    site = pywikibot.Site('uk', 'wikipedia')
     page = pywikibot.Page(site, sys.argv[1])
 
     page.text = templetify_links(page.text)
@@ -31,10 +31,14 @@ def templetify_links(text):
         text = re.sub(context, expand_url, text, flags=re.M)
 
     templetify_context(rf'^\* {url_regexp}$')
+    templetify_context(rf'^\# {url_regexp}$')
     templetify_context(rf'<ref(?: name=.+?)?>{url_regexp}</ref>')
+    templetify_context(rf'^\* {ext_link_regexp}$')
+    templetify_context(rf'<ref(?: name=.+?)?>{ext_link_regexp}</ref>')
     return text
 
-url_regexp = r'\[?(?P<url>https?://(?:[\w_-]+(?:(?:\.[\w_-]+)+))(?:[\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?)\]?'
+url_regexp = r'\[?(?P<url>https?://(?:[\w_-]+(?:(?:\.[\w_-]+)+))(?:[\w\.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?)\]?'
+ext_link_regexp = r'\[(?P<url>https?://(?:[\w_-]+(?:(?:\.[\w_-]+)+))(?:[\w\.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?) .*?\]'
 
 def get_meta(tree, selector, attribute='content'):
     m = tree.find('//meta[%s]' % selector)
@@ -66,7 +70,11 @@ class Fields:
 def expand_url(match):
     url = match.group('url')
     assert url
-    m = metadata(url)
+    try:
+        m = metadata(url)
+    except Exception as e:
+        print(e)
+        return match.group(0)
     today = f'{now.day} {MONTHS_GENITIVE[now.month - 1]} {now.year}'
 
     return match.group(0).replace(url, f'''{{{{cite web

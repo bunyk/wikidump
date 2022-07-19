@@ -53,7 +53,7 @@ TITLE_EXCEPTIONS = [
     "Вікіпедія:Проект:Біологія/Неперекладені статті",
 ]
 
-TIME_PER_PAGE = timedelta(seconds=6)  # To estimate remaining time
+TIME_PER_PAGE = timedelta(seconds=7)  # To estimate remaining time
 PROBLEMS_UPDATE_PERIOD = timedelta(hours=12)  # Update problems page every
 
 SITE = pywikibot.Site("uk", "wikipedia")

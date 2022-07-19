@@ -8,8 +8,7 @@ and add all the existing uk pages to that category.
 import pywikibot
 
 TODO = """
-Аугустус де Морган
-Нед Ладд
+Теракт у Токійському метро
 """
 
 def main():
