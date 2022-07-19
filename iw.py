@@ -549,8 +549,8 @@ def iw_templates(text):
 
 def deduplicate_comments(text):
     return re.sub(
-        rf"<!--(.+?)\({BOT_NAME}\)-->(<!--\1\({BOT_NAME}\)-->)+",
-        rf"<!--\1({BOT_NAME})-->",
+        rf"<!-- Проблема вікіфікації: (.+?)-->(<!-- Проблема вікіфікації: \1-->)+",
+        rf"<!-- Проблема вікіфікації: \1-->",
         text,
     )
 
