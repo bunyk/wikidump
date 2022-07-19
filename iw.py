@@ -26,6 +26,7 @@ def main():
     robot.run()
 
     # title = 'Війна за незалежність США'
+    # title = 'Операційні системи на основі вільного програмного забезпечення'
     # robot.process(pywikibot.Page(SITE, title))
 
 
@@ -401,6 +402,16 @@ class IwBot:
                 error_msg = (
                     f"Сторінка {pagelink} перекладена як "
                     f"{conv2wikilink(there['uk_version'])}, "
+                    f"хоча хотіли {conv2wikilink(uk_title)}"
+                )
+                raise IwExc(error_msg)
+            if there["redirect_uk_version"]:
+                pagelink = f"[[:{lang}:{external_title}]]"
+                if there["redirect"]:
+                    pagelink += f' (→ [[:{lang}:{there["redirect"]}]])'
+                error_msg = (
+                    f"Сторінка {pagelink} перекладена як "
+                    f"{conv2wikilink(there['redirect_uk_version'])}, "
                     f"хоча хотіли {conv2wikilink(uk_title)}"
                 )
                 raise IwExc(error_msg)
