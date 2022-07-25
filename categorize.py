@@ -5,16 +5,12 @@ of the same page.
 For every added category, check which pages are in en version of the category,
 and add all the existing uk pages to that category.
 '''
+import sys
+
 import pywikibot
 
-TODO = """
-Теракт у Токійському метро
-"""
-
 def main():
-    for pn in TODO.splitlines():
-        if pn.strip():
-            add_en_cats(pn.strip())
+    add_en_cats(sys.argv[1])
 
 site = pywikibot.Site('uk', 'wikipedia')
 

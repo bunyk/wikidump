@@ -22,8 +22,8 @@ from constants import LANGUAGE_CODES, BOT_NAME
 
 def main():
     print("lets go!")
-    robot = IwBot(search_backlog())
-    robot.run()
+    robot = IwBot(search_backlog)
+    robot.run_forever()
 
     # title = 'Війна за незалежність США'
     # title = 'Операційні системи на основі вільного програмного забезпечення'
@@ -196,6 +196,7 @@ HIBERNATE_FILE = "iwbot.json"
 
 class IwBot:
     def __init__(self, pages):
+        self.pages = pages
         self.backlog = []
         self.problems = {}
         self.last_problems_update = None
@@ -203,7 +204,7 @@ class IwBot:
         self.cursor = 0
 
         if not self.load():
-            self.backlog = order_backlog(pages)
+            self.backlog = order_backlog(pages())
 
         self.wiki_cache = WikiCache()
         self.processed_pages = set()
@@ -228,6 +229,12 @@ class IwBot:
         except Exception:
             return False
 
+    def reset():
+        self.cache.clear()
+        self.backlog = order_backlog(self.pages())
+        self.cursor = 0
+        self.to_translate = Counter()
+
     def run(self):
         try:
             while self.cursor < len(self.backlog):
@@ -237,10 +244,17 @@ class IwBot:
                 self.cursor += 1
                 self.process_problems()  # maybe
             self.publish_stats()
+            self.reset()
+            return True
         except KeyboardInterrupt:
             print("Saving work")
             self.save()
             print("Stopping")
+            return False
+
+    def run_forever(self):
+        while self.run():
+            pass
 
     def process_problems(self):
         if self.last_problems_update is not None and (
@@ -263,17 +277,6 @@ class IwBot:
             self.process(page)
         except Exception as e:
             self.add_problem(page, "Неочікувана помилка: %s %s" % (type(e), e))
-
-    def run_mixed(self):
-
-        interrupt()
-
-        start = datetime.now()
-        for _ in self.run("backlinks"):
-            if (datetime.now() - start) > timedelta(hours=12):
-                start = datetime.now()
-                interrupt()
-        self.publish_stats()
 
     def publish_stats(self):
         page = pywikibot.Page(

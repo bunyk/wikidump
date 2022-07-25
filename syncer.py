@@ -89,7 +89,7 @@ def save(page):
 def main():
     parser = argparse.ArgumentParser(description='Syncronize wiki pages with local files')
 
-    parser.add_argument('-s', '--search', help='search query')
+    parser.add_argument('-s', '--search', required=True, help='search query')
     parser.add_argument('-c', '--comment', default='bot changes', help='change comment')
     parser.add_argument('-l', '--limit', type=int, default=20, help='limit on number of pages to download')
     parser.add_argument('-n', '--namespaces', action='store', nargs="*", default=[0], type=int, help='namespaces to download')
