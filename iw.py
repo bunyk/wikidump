@@ -482,6 +482,7 @@ class IwBot:
 LANGUAGE_MAPPINGS = dict(  # common language code mistakes
     cz="cs",
     jp="ja",
+    rup="roa-rup",
 )
 
 
