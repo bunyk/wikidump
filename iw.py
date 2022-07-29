@@ -229,8 +229,8 @@ class IwBot:
         except Exception:
             return False
 
-    def reset():
-        self.cache.clear()
+    def reset(self):
+        self.wiki_cache.clear()
         self.backlog = order_backlog(self.pages())
         self.cursor = 0
         self.to_translate = Counter()
