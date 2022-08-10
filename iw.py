@@ -22,7 +22,8 @@ from constants import LANGUAGE_CODES, BOT_NAME
 
 def main():
     print("lets go!")
-    robot = IwBot(search_backlog)
+    robot = IwBot(backlinks_backlog)
+    # robot.last_problems_update = datetime.now()
     robot.run_forever()
 
     # title = 'Війна за незалежність США'
