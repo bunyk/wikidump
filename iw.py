@@ -26,8 +26,7 @@ def main():
     # robot.last_problems_update = datetime.now()
     robot.run_forever()
 
-    # title = 'Війна за незалежність США'
-    # title = 'Операційні системи на основі вільного програмного забезпечення'
+    title = 'Вікіпедія:Чим не є Вікіпедія'
     # robot.process(pywikibot.Page(SITE, title))
 
 
@@ -115,7 +114,7 @@ class WikiCache:
         def get_uk_version(item):
             sl = item.sitelinks.get("ukwiki")
             if sl:
-                return sl.title
+                return sl.ns_title()
 
         if lang == "d":
             site = self.get_site("d")
