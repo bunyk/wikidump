@@ -23,7 +23,7 @@ from constants import LANGUAGE_CODES, BOT_NAME
 def main():
     print("lets go!")
     robot = IwBot(backlinks_backlog)
-    # robot.last_problems_update = datetime.now()
+    robot.last_problems_update = datetime.now() - timedelta(hours=6)
     robot.run_forever()
 
     title = 'Вікіпедія:Чим не є Вікіпедія'
@@ -94,7 +94,11 @@ class WikiCache:
         if key in self.cache:
             return self.cache[key]
 
-        res = self._fetch_page_and_wikidata(lang, title)
+        try: 
+            res = self._fetch_page_and_wikidata(lang, title)
+        except pywikibot.exceptions.InvalidTitleError as e:
+            raise IwExc(str(e))
+
         self.cache[key] = res
         return res
 
@@ -155,7 +159,9 @@ class WikiCache:
 NAMESPACES = [
     0,  # main
     4,  # Вікіпедія
+    6,  # File
     10,  # template
+    14, # category
 ]
 
 

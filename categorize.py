@@ -105,7 +105,11 @@ def add_en_cats(pagename):
         return
     enpage = pywikibot.Page(site, 'en:'+entitle)
     for cat in reversed(list(enpage.categories())):
-        if cat.title().startswith('Category:Wikipedia articles '):
+        if isprefixed(cat.title(),
+                'Category:All articles',
+                'Category:Wikipedia articles ',
+                'Category:Articles ',
+            ):
             print("Skip", cat)
             continue
         uk_cat = get_uk_version(cat)
