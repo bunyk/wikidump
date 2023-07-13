@@ -26,9 +26,9 @@ def main():
  
 def find_suggestions(link, frequency, existing_pages):
     suggestions = []
-    for edit in edits2(link):
-        # if just_number_diff(edit, link):
-        #     continue
+    for edit in deletes_and_doubles(link):
+        if just_number_diff(edit, link):
+            continue
         if edit in existing_pages:
             suggestions.append(edit)
     if suggestions:
@@ -56,6 +56,11 @@ def edits1(text):
     replaces   = [L + c + R[1:]           for L, R in splits if R for c in ALPHABET]
     inserts    = [L + c + R               for L, R in splits for c in ALPHABET]
     return set(deletes + transposes + replaces + inserts)
+
+def deletes_and_doubles(text):
+    splits     = [(text[:i], text[i:])    for i in range(len(text) + 1)]
+    doubles    = [L + R[0] + R            for L, R in splits if R and R[0] != 'I']
+    return set(doubles)
 
 def edits2(text):
     return set(

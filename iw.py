@@ -19,11 +19,13 @@ import mwparserfromhell
 
 from constants import LANGUAGE_CODES, BOT_NAME
 
+MAX_SUPPORTED_TEXT_LEN = 250000
+
 
 def main():
     print("lets go!")
     robot = IwBot(backlinks_backlog)
-    robot.last_problems_update = datetime.now() - timedelta(hours=6)
+    robot.last_problems_update = datetime.now() - PROBLEMS_UPDATE_PERIOD # timedelta(hours=12)
     robot.run_forever()
 
     title = 'Вікіпедія:Чим не є Вікіпедія'
@@ -44,6 +46,25 @@ IWTMPLS = [
     "Не переведено 5",
 ]
 
+DO_NOT_DISTURB_TMPLS = [
+    "У роботі",
+    "Edited-by",
+    "В роботі",
+    "Пишу",
+    "In progress",
+    "Inuse",
+    "In process",
+    "In use",
+    "Editing",
+    "Under construction",
+    "Underconstruction",
+    "Редагування",
+    "Редагую",
+    "Draft",
+    "Inuse-by",
+    "Edited",
+]
+
 # If page name has one of this prefixes - skip it:
 TITLE_EXCEPTIONS = [
     "Обговорення:",
@@ -55,7 +76,7 @@ TITLE_EXCEPTIONS = [
 ]
 
 TIME_PER_PAGE = timedelta(seconds=7)  # To estimate remaining time
-PROBLEMS_UPDATE_PERIOD = timedelta(hours=12)  # Update problems page every
+PROBLEMS_UPDATE_PERIOD = timedelta(hours=24)  # Update problems page every
 
 SITE = pywikibot.Site("uk", "wikipedia")
 
@@ -71,7 +92,8 @@ class IwExc(Exception):
 
 
 def conv2wikilink(text):
-    if text.startswith("Файл:") or text.startswith("Категорія:"):
+    if (text.startswith("Файл:") or text.startswith("Категорія:") or
+       text.startswith("File:") or text.startswith("Category:")):
         text = ":" + text
     return f"[[{text}]]"
 
@@ -302,12 +324,26 @@ class IwBot:
             if page.title().startswith(exc):
                 print("Skipping page because of title")
                 return
+            
         new_text = page.text
         new_text = re.sub(
             rf"<!-- Проблема вікіфікації: .+?-->", "", new_text
         )
         summary = set()
-        for tmpl in iw_templates(new_text):
+
+        code = mwparserfromhell.parse(new_text)
+        if do_not_disturb(code):
+            print("Skipping because of edit template")
+            return
+
+        for tmpl in iw_templates(code):
+            if len(page.text) > MAX_SUPPORTED_TEXT_LEN:
+                print("Skipping page because of size", len(page.text), "characters")
+                self.add_problem(
+                    page,
+                    "Сторінка завелика (%d символів), тому редагувати через API важко" % len(page.text),
+                )
+                return
             replacement = False
             problem = False
             try:
@@ -351,7 +387,13 @@ class IwBot:
             summary.add("виправлена вікіфікація")
         # Do additional replacements
         new_text = re.sub(r"\[\[([^|\d]+)\|\1([^\W\d]*)]]", r"[[\1]]\2", new_text)
-        update_page(page, new_text, ", ".join(summary))
+        try: 
+            update_page(page, new_text, ", ".join(summary))
+        except pywikibot.exceptions.OtherPageSaveError as e:
+            if 'Editing restricted by' in str(e):
+                return
+            raise e
+
 
     def find_replacement(self, tmpl):
         """Return string to which template should be replaced, if it should
@@ -433,7 +475,9 @@ class IwBot:
         print("\t>>> " + message)
 
     def format_top(self, n=500):
-        top = str(n) + " найпотрібніших перекладів:\n"
+        top = f'Потребують перекладу {len(self.to_translate)} різних сторінок.\n'
+        top += f'Загальна кількість червоних посилань до перекладу: {sum(self.to_translate.values())}.\n\n'
+        top += f'{n} найпотрібніших перекладів:\n'
         top += '{| class="standard sortable"\n'
         top += "! Сторінка до перекладу || N\n"
         for page, n in self.to_translate.most_common(n):
@@ -475,7 +519,7 @@ class IwBot:
                 probl += tablAppend
         probl += "|}"
 
-        probl = f"""Ситуація станом на {datetime.now().strftime(TIME_FORMAT)}. Переглянуто {self.cursor} сторінок. Всього сторінок з проблемами: {len(self.problems)}.
+        probl = f"""Ситуація станом на {datetime.now().strftime(TIME_FORMAT)}. Переглянуто {self.cursor} з {len(self.backlog)} сторінок. Всього сторінок з проблемами: {len(self.problems)}.
 
 == Сторінки до виправлення ==
 
@@ -544,15 +588,19 @@ def update_page(page, new_text, comment):
     page.save(comment)
 
 
-def is_iw_tmpl(name):
+def name_in_list(name, lst):
     n = name.strip()
-    return (n[0].upper() + n[1:]) in IWTMPLS
+    return (n[0].upper() + n[1:]) in lst
 
-
-def iw_templates(text):
-    code = mwparserfromhell.parse(text)
+def do_not_disturb(code):
     for tmpl in code.filter_templates():
-        if is_iw_tmpl(tmpl.name):
+        if name_in_list(tmpl.name, DO_NOT_DISTURB_TMPLS):
+            return True
+    return False
+
+def iw_templates(code):
+    for tmpl in code.filter_templates():
+        if name_in_list(tmpl.name, IWTMPLS):
             yield tmpl
 
     for tag in code.filter_tags():
@@ -565,7 +613,7 @@ def iw_templates(text):
             if not "|" in l:
                 continue
             _, desc = l.split("|", 1)
-            yield from iw_templates(desc)
+            yield from iw_templates(mwparserfromhell.parse(desc))
 
 
 def deduplicate_comments(text):

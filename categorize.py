@@ -10,7 +10,7 @@ import sys
 import pywikibot
 
 def main():
-    add_en_cats(sys.argv[1])
+    add_cats(sys.argv[1], sys.argv[2])
 
 site = pywikibot.Site('uk', 'wikipedia')
 
@@ -97,13 +97,13 @@ def get_translation(page, lang):
 def get_uk_version(page):
     return get_translation(page, 'uk')
 
-def add_en_cats(pagename):
+def add_cats(lang, pagename):
     page = pywikibot.Page(site, pagename)
-    entitle = get_translation(page, 'en')
+    entitle = get_translation(page, lang)
     if not entitle:
-        print(pagename, "не має відповідника в англійській вікіпедії")
+        print(f"{pagename} не має відповідника в {lang} вікіпедії")
         return
-    enpage = pywikibot.Page(site, 'en:'+entitle)
+    enpage = pywikibot.Page(site, lang + ':'+entitle)
     for cat in reversed(list(enpage.categories())):
         if isprefixed(cat.title(),
                 'Category:All articles',
@@ -121,7 +121,7 @@ def add_en_cats(pagename):
         if uk_cat.startswith('Категорія:'):
             uk_cat = uk_cat[len('Категорія:'):]
         if uk_cat:
-            translate_category('en:' + cat.title(), 'Категорія:' + uk_cat)
+            translate_category(lang + ':' + cat.title(), 'Категорія:' + uk_cat)
 
 if __name__ == "__main__":
     main()

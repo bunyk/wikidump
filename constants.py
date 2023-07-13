@@ -17,6 +17,7 @@ LANGUAGE_CODES = set([
     "as",
     "ast",
     "av",
+    "avk",
     "ay",
     "az",
     "ba",

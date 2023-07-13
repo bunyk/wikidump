@@ -28,7 +28,7 @@ def search(query, namespaces):
 
     for page in pagegenerators.SearchPageGenerator(query, site=SITE, namespaces=namespaces):
         title = page.title()
-        if ('/' in title) or (title in excludes):
+        if title in excludes:
             continue
         yield page
 
@@ -66,7 +66,7 @@ def on_modified(event):
     with open(event.src_path) as f:
         text = f.read()
 
-    update_page(event.src_path[len(PAGES_DIR) +3:-len('.wiki')], text, COMMENT)
+    update_page(event.src_path[len(PAGES_DIR) +3:-len('.wiki')].replace('_SLASH_', '/'), text, COMMENT)
 
 
 def update_page(name, new_text, comment):
@@ -78,8 +78,10 @@ def update_page(name, new_text, comment):
     page.text = new_text
     page.save(comment)
 
+
+
 def save(page):
-    filename = PAGES_DIR + '/' + page.title() + '.wiki'
+    filename = PAGES_DIR + '/' + page.title().replace('/', '_SLASH_') + '.wiki'
 
     with open(filename, 'w') as f:
         f.write(page.text)
