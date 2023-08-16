@@ -13,9 +13,11 @@ import traceback
 import itertools
 from collections import Counter
 import random
+import sys
 
 import pywikibot
 import mwparserfromhell
+from tqdm import tqdm
 
 from constants import LANGUAGE_CODES, BOT_NAME
 
@@ -25,7 +27,10 @@ MAX_SUPPORTED_TEXT_LEN = 250000
 def main():
     print("lets go!")
     robot = IwBot(backlinks_backlog)
-    robot.last_problems_update = datetime.now() - PROBLEMS_UPDATE_PERIOD # timedelta(hours=12)
+    delay = 0
+    if len(sys.argv) > 1:
+        delay = int(sys.argv[1])
+    robot.last_problems_update = datetime.now() - PROBLEMS_UPDATE_PERIOD + timedelta(hours=delay)
     robot.run_forever()
 
     title = 'Вікіпедія:Чим не є Вікіпедія'
@@ -75,7 +80,6 @@ TITLE_EXCEPTIONS = [
     "Вікіпедія:Проект:Біологія/Неперекладені статті",
 ]
 
-TIME_PER_PAGE = timedelta(seconds=7)  # To estimate remaining time
 PROBLEMS_UPDATE_PERIOD = timedelta(hours=24)  # Update problems page every
 
 SITE = pywikibot.Site("uk", "wikipedia")
@@ -265,12 +269,14 @@ class IwBot:
 
     def run(self):
         try:
-            while self.cursor < len(self.backlog):
-                self.process_step(
-                    self.backlog[self.cursor], self.cursor, len(self.backlog)
-                )
-                self.cursor += 1
-                self.process_problems()  # maybe
+            with tqdm(total=len(self.backlog), initial=self.cursor) as pbar:
+                while self.cursor < len(self.backlog):
+                    title = self.backlog[self.cursor]
+                    self.process_step(title)
+                    self.cursor += 1
+                    pbar.update(1)
+                    pbar.set_postfix(page=title)
+                    self.process_problems()  # maybe
             self.publish_stats()
             self.reset()
             return True
@@ -293,18 +299,22 @@ class IwBot:
         self.problems = {}
 
         problem_titles = order_backlog(list_problem_pages())
-        for i, title in enumerate(problem_titles):
-            self.process_step(title, i, len(problem_titles))
+        for title in (pbar := tqdm(problem_titles)):
+            pbar.set_postfix(page=title)
+            self.process_step(title)
         self.update_problems()
 
-    def process_step(self, title, i, total):
-        eta = TIME_PER_PAGE * (total - i)
-        print(f"{i+1}/{total} (eta: {eta}): {title}")
-        page = pywikibot.Page(SITE, title)
-        try:
-            self.process(page)
-        except Exception as e:
-            self.add_problem(page, "Неочікувана помилка: %s %s" % (type(e), e))
+    def process_step(self, title):
+        while True:
+            page = pywikibot.Page(SITE, title)
+            try:
+                self.process(page)
+                break
+            except pywikibot.exceptions.EditConflictError as e:
+                print("Edit conflict, trying again")
+            except Exception as e:
+                self.add_problem(page, "Неочікувана помилка: %s %s" % (type(e), e))
+                break
 
     def publish_stats(self):
         page = pywikibot.Page(
@@ -315,7 +325,12 @@ class IwBot:
 
     def update_problems(self):
         page = pywikibot.Page(SITE, ERROR_REPORT_TITLE)
-        update_page(page, self.format_problems(), "Автоматичне оновлення таблиць")
+        update_page(page, self.format_problems(None), "Автоматичне оновлення таблиць")
+
+        for pn, project in PROJECTS.items():
+            page = pywikibot.Page(SITE, project['errors_page'])
+            update_page(page, self.format_problems(pn), "Автоматичне оновлення таблиць")
+
         self.last_problems_update = datetime.now()
 
     def process(self, page):
@@ -339,10 +354,6 @@ class IwBot:
         for tmpl in iw_templates(code):
             if len(page.text) > MAX_SUPPORTED_TEXT_LEN:
                 print("Skipping page because of size", len(page.text), "characters")
-                self.add_problem(
-                    page,
-                    "Сторінка завелика (%d символів), тому редагувати через API важко" % len(page.text),
-                )
                 return
             replacement = False
             problem = False
@@ -469,9 +480,15 @@ class IwBot:
 
     def add_problem(self, page, message):
         page_title = page.title()
-        if not page_title in self.problems.keys():
-            self.problems[page_title] = []
-        self.problems[page_title].append(message)
+        page_project = detect_project(page)
+
+        if not page_project in self.problems:
+            self.problems[page_project] = {}
+
+        if not page_title in self.problems[page_project]:
+            self.problems[page_project][page_title] = []
+
+        self.problems[page_project][page_title].append(message)
         print("\t>>> " + message)
 
     def format_top(self, n=500):
@@ -485,13 +502,13 @@ class IwBot:
         top += "|}"
         return top
 
-    def format_problems(self):
+    def format_problems(self, project):
         probl = '{| class="standard sortable"\n'
         probl += "! Стаття з проблемами || Опис проблеми || N\n"
-        for problem in sorted(self.problems.keys()):
+        for problem in sorted(self.problems[project].keys()):
             Nproblems = 0
             tablAppend = ""
-            for prob in self.problems[problem]:
+            for prob in self.problems[project][problem]:
                 Nproblems += 1
                 if Nproblems == 1:
                     firstMessage = prob
@@ -519,7 +536,7 @@ class IwBot:
                 probl += tablAppend
         probl += "|}"
 
-        probl = f"""Ситуація станом на {datetime.now().strftime(TIME_FORMAT)}. Переглянуто {self.cursor} з {len(self.backlog)} сторінок. Всього сторінок з проблемами: {len(self.problems)}.
+        probl = f"""Ситуація станом на {datetime.now().strftime(TIME_FORMAT)}.
 
 == Сторінки до виправлення ==
 
@@ -625,6 +642,12 @@ def deduplicate_comments(text):
 
 
 def list_problem_pages():
+    for pn, project in PROJECTS.items():
+        pp = pywikibot.Page(SITE, project['errors_page'])
+        titles = re.findall(r'^\| (?:rowspan="\d+" \| )?\[\[([^\]]+)]]', pp.text, re.M)
+        for title in titles:
+            yield pywikibot.Page(SITE, title)
+
     pp = pywikibot.Page(SITE, ERROR_REPORT_TITLE)
     titles = re.findall(r'^\| (?:rowspan="\d+" \| )?\[\[([^\]]+)]]', pp.text, re.M)
     for title in titles:
@@ -634,6 +657,49 @@ def list_problem_pages():
         if page.title() not in titles:
             yield page
 
+
+PROJECTS = dict(
+    comp=dict(
+        cat="Категорія:Статті проєкту Комп'ютерні науки",
+        errors_page='Вікіпедія:Проєкт:Комп\'ютерні науки/Сторінки з неправильно використаним шаблоном "Не перекладено"',
+        page="Вікіпедія:Проєкт:Комп'ютерні науки",
+
+    ),
+    anime=dict(
+        cat="Категорія:Статті проєкту Аніме та манґа",
+        errors_page='Вікіпедія:Проєкт:Аніме та манґа/Сторінки з неправильно використаним шаблоном "Не перекладено"',
+        page='Вікіпедія:Проєкт:Аніме та манґа',
+    ),
+    bio=dict(
+        cat="Категорія:Статті проєкту Біологія",
+        errors_page='Вікіпедія:Проєкт:Біологія/Сторінки з неправильно використаним шаблоном "Не перекладено"',
+        page='Вікіпедія:Проєкт:Біологія',
+    ),
+    math=dict(
+        cat="Категорія:Статті проєкту Математика",
+        page='Вікіпедія:Проєкт:Математика',
+        errors_page='Вікіпедія:Проєкт:Математика/Сторінки з неправильно використаним шаблоном "Не перекладено"',
+    ),
+    med=dict(
+        cat="Категорія:Статті проєкту Медицина",
+        errors_page='Вікіпедія:Проєкт:Медицина/Сторінки з неправильно використаним шаблоном "Не перекладено"',
+        page='Вікіпедія:Проєкт:Медицина',
+    ),
+    femin=dict(
+        cat="Категорія:Статті проєкту Фемінізм",
+        errors_page='Вікіпедія:Проєкт:Фемінізм/Сторінки з неправильно використаним шаблоном "Не перекладено"',
+        page='Вікіпедія:Проєкт:Фемінізм',
+    ),
+)
+
+def detect_project(p):
+    tp = p.toggleTalkPage()
+    talk_cats = {c.title() for c in tp.categories()}
+    for pn, project in PROJECTS.items():
+        if project['page'] in p.title():
+            return pn
+        if project['cat'] in talk_cats:
+            return pn
 
 if __name__ == "__main__":
     main()

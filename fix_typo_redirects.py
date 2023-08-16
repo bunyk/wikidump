@@ -18,9 +18,9 @@ for r in pagegenerators.PreloadingGenerator(cat.articles(), 100):
 
     for p in pages2fix:
 
-        if p.namespace().canonical_name in {'User', 'User talk'}: # ingore some namespaces
+        if p.namespace().canonical_name in {'User', 'User talk', 'Project'}: # ingore some namespaces
             continue
-        if p.title().endswith('/Червоні посилання'):
+        if p.title().endswith('/Червоні посилання') or p.title().endswith('Нова стаття/Архів'):
             continue
 
         print('\tНа сторінці', p.title())
@@ -31,6 +31,8 @@ for r in pagegenerators.PreloadingGenerator(cat.articles(), 100):
         for link in wikicode.filter_wikilinks():
             if link.title == r_from:
                 link.title = r_to
+            elif link.title == r_from[0].lower() + r_from[1:]:
+                link.title == r_to[0].lower() + r_to[1:]
         new_text = str(wikicode)
         new_text = new_text.replace(
             '|посилання=%s|' % r_from, 
