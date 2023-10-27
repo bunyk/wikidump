@@ -26,8 +26,6 @@ MAX_SUPPORTED_TEXT_LEN = 300000
 
 def main():
     print("lets go!")
-    print(list(detect_projects(pywikibot.Page(SITE, 'Ctenosaura'))))
-    return
     robot = IwBot(backlinks_backlog)
     delay = 0
     if len(sys.argv) > 1:
@@ -669,7 +667,7 @@ PROJECTS = dict(
     bio=dict(
         page='Вікіпедія:Проєкт:Біологія',
         aliases=['Проєкт:Історія біології'],
-        pattern="Cтаття проєкту ((Молекулярна )?біологія|Екологія|Ентомологія|Історія біології|Г?риби|Птахи)",
+        pattern="Стаття проєкту ((Молекулярна )?біологія|Екологія|Ентомологія|Історія біології|Г?риби|Птахи)",
     ),
     cinema=dict(
         page="Вікіпедія:Проєкт:Кінематограф",
