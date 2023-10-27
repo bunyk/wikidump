@@ -31,13 +31,15 @@ mixed_re = f'[a-z{CYR}’]*(?:[a-z][{CYR}]|[{CYR}][a-z])[a-z{CYR}’]*'
 
 PRE_FIXES = [
     (r' iн\.', ' ін.'),
+    (r' iм\.', ' ім.'),
     (r'ghfворуч', 'праворуч'),
     (r'([^&])nbsp;', r'\1&nbsp;'),
     (r'&nbsp([^;])', r'&nbsp;\1'),
+    (r'cт\.', r'ст.'),
 ]
 
 EXCEPTION_AREAS = [
-    r'\{\{F.*?\}\}', # weird templates
+    r'\{\{(F|In).*?\}\}', # weird templates
     r'[КФТСЛ]р?[a-h]?x?[a-h][1-8]', # chess
     r'\[\[(?:Файл|File):.*?\]\]',
     r'(?:Файл|File):.*?\|',
@@ -46,17 +48,27 @@ EXCEPTION_AREAS = [
     r'%[A-Z0-9]{2}', # URLencoding
 ]
 
-TO_KEEP = '''AVтограф
+TO_KEEP = '''
+AVтограф
+2SLБ
+3SLBФ
+3SLБ
 DЦ
 Dруга Ріка
 FANтастика
 Flёur
+FМВС
+InВДВ
+InМЕХ
+KaZaнтип
 KaZaнтип
 KoЯN
 KoЯn
 Lюk
 Lюk-дует
 Lюк
+MEGAКАВА
+Megaкава
 NOνA
 NЭНСИ
 Pianoбой
@@ -66,20 +78,28 @@ RЕФLEKSIЯ
 Starперці
 Superнянь
 Tvій
+Ukraїner
 Uлія
-Лорd
 Vavёrka
 Vася
+Vмакс
 Wideнь
 Zалупа
 Zаникай
 Zомбі
 Zоряна
+dsРНК
+ssРНК
 ΜTorrent
 ΦX174
-ЄльціUA
 ΦX174
+ΦX174
+ЄльціUA
+АрміяInform
+Арміяinform
 БраZерс
+Вниz
+ВолиньPost
 ГАМКA
 ГАМКB
 ГАМКC
@@ -87,42 +107,35 @@ Zоряна
 ГогольFest
 Гогольfest
 ДМ-SLБ
-нароDJення
+Дзядuк
+Духless
 ЖАRА
-2SLБ
-3SLBФ
-3SLБ
 КАZАНТИП
-Вниz
 КримSOS
 ЛжеNostradamus
+Лорd
 ЛітераDYPA
 МакSим
 Модель ΛCDM
 МікрOFFONна
 НаCLICKай
-KaZaнтип
+ПоLOVEинки
 СкруDG
 СловоUA
-СуперWASP
 Снjпъ
+СуперWASP
+ТаблоID
+УкрFace
 УкраїнSKA
-ΦX174
 ФлайzZzа
 ШELTER+
 ШАNA
 ШОУМАSТГОУОН
 ШоумаSтгоуон
 Яndex
-ПоLOVEинки
-Духless
-FМВС
 еXтра
-Vмакс
-ssРНК
-dsРНК
-УкрFace
 мікроQR
+нароDJення
 '''.splitlines()
 
 
@@ -138,8 +151,10 @@ def iter_mixed(dump_filename):
 
         mixed = find_mixes(page.text)
         if mixed:
-            # print(len(mixed), page.title + ':', ', '.join(colored(mix) for mix in mixed[:5]))
-            yield page.title
+            new_text = fix_page_text(page.text)
+            if new_text != page.text :
+                # print(len(mixed), page.title + ':', ', '.join(colored(mix) for mix in mixed[:5]))
+                yield page.title
 
 def find_mixes(text):
     return re.findall(mixed_re, text, re.I)
@@ -182,6 +197,12 @@ from iw import update_page
 def fix_page(pagename):
     print('\n\t =', pagename, '=')
     page = pywikibot.Page(site, pagename)
+    if '/Архів' in page.title():
+        print('Архів, пропускаємо')
+        return
+    if len(page.text) > 300000:
+        print('Сторінка задовга')
+        return
     mixes = re.findall(mixed_re, page.text, re.I)
     if mixes:
         print(' - ' + '\n - '.join(map(colored, mixes)))

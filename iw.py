@@ -21,11 +21,13 @@ from tqdm import tqdm
 
 from constants import LANGUAGE_CODES, BOT_NAME
 
-MAX_SUPPORTED_TEXT_LEN = 250000
+MAX_SUPPORTED_TEXT_LEN = 300000
 
 
 def main():
     print("lets go!")
+    print(list(detect_projects(pywikibot.Page(SITE, 'Ctenosaura'))))
+    return
     robot = IwBot(backlinks_backlog)
     delay = 0
     if len(sys.argv) > 1:
@@ -36,6 +38,10 @@ def main():
     title = 'Вікіпедія:Чим не є Вікіпедія'
     # robot.process(pywikibot.Page(SITE, title))
 
+
+REPLACE_SUMMARY = "[[User:PavloChemBot/Iw|автоматична заміна]] {{[[Шаблон:Не перекладено|Не перекладено]]}} вікі-посиланнями на перекладені статті"
+
+ERROR_REPORT_TITLE = 'Сторінки з неправильно використаним шаблоном "Не перекладено"'
 
 # Template name variations
 IWTMPLS = [
@@ -78,17 +84,12 @@ TITLE_EXCEPTIONS = [
     "Шаблон:Не перекладено",
     "Вікіпедія:Завдання для роботів",
     "Вікіпедія:Проект:Біологія/Неперекладені статті",
+    ERROR_REPORT_TITLE,
 ]
 
 PROBLEMS_UPDATE_PERIOD = timedelta(hours=24)  # Update problems page every
 
 SITE = pywikibot.Site("uk", "wikipedia")
-
-REPLACE_SUMMARY = "[[User:PavloChemBot/Iw|автоматична заміна]] {{[[Шаблон:Не перекладено|Не перекладено]]}} вікі-посиланнями на перекладені статті"
-
-ERROR_REPORT_TITLE = f'Користувач:{BOT_NAME}/Сторінки з неправильно використаним шаблоном "Не перекладено"'
-TIME_FORMAT = "%Y-%m-%d %H:%M"
-
 
 class IwExc(Exception):
     def __init__(self, message):
@@ -275,7 +276,7 @@ class IwBot:
                     self.process_step(title)
                     self.cursor += 1
                     pbar.update(1)
-                    pbar.set_postfix(page=title)
+                    pbar.set_postfix(page=f'{title:_<40.40s}')
                     self.process_problems()  # maybe
             self.publish_stats()
             self.reset()
@@ -300,7 +301,7 @@ class IwBot:
 
         problem_titles = order_backlog(list_problem_pages())
         for title in (pbar := tqdm(problem_titles)):
-            pbar.set_postfix(page=title)
+            pbar.set_postfix(page=f'{title:_<40.40s}')
             self.process_step(title)
         self.update_problems()
 
@@ -324,11 +325,8 @@ class IwBot:
         update_page(page, self.format_top(), "Автоматичне оновлення таблиць")
 
     def update_problems(self):
-        page = pywikibot.Page(SITE, ERROR_REPORT_TITLE)
-        update_page(page, self.format_problems(None), "Автоматичне оновлення таблиць")
-
         for pn, project in PROJECTS.items():
-            page = pywikibot.Page(SITE, project['errors_page'])
+            page = pywikibot.Page(SITE, project['page'] + '/' + ERROR_REPORT_TITLE)
             update_page(page, self.format_problems(pn), "Автоматичне оновлення таблиць")
 
         self.last_problems_update = datetime.now()
@@ -336,7 +334,7 @@ class IwBot:
     def process(self, page):
         """Process page to remove unnecessary iw templates"""
         for exc in TITLE_EXCEPTIONS:
-            if page.title().startswith(exc):
+            if exc in page.title():
                 print("Skipping page because of title")
                 return
             
@@ -353,7 +351,7 @@ class IwBot:
 
         for tmpl in iw_templates(code):
             if len(page.text) > MAX_SUPPORTED_TEXT_LEN:
-                print("Skipping page because of size", len(page.text), "characters")
+                print("Skipping", page.title(), "because of size", len(page.text), "characters")
                 return
             replacement = False
             problem = False
@@ -380,7 +378,7 @@ class IwBot:
                 summary.add(REPLACE_SUMMARY)
             if problem:
                 new_text = new_text.replace(str(tmpl), problem)
-                summary.add("повідомлення про помилки вікіфікації")
+                summary.add("присутні [[Шаблон:Не_перекладено/документація#Якщо_бот_робить_зауваження|проблеми вікіфікації]]")
 
         # avoid duplication of comments
         new_text = deduplicate_comments(new_text)
@@ -479,17 +477,17 @@ class IwBot:
                 raise IwExc(error_msg)
 
     def add_problem(self, page, message):
+        print("\n\t>>> " + message)
+
         page_title = page.title()
-        page_project = detect_project(page)
+        for page_project in  list(detect_projects(page)) or [None]:
+            if not page_project in self.problems:
+                self.problems[page_project] = {}
 
-        if not page_project in self.problems:
-            self.problems[page_project] = {}
+            if not page_title in self.problems[page_project]:
+                self.problems[page_project][page_title] = []
 
-        if not page_title in self.problems[page_project]:
-            self.problems[page_project][page_title] = []
-
-        self.problems[page_project][page_title].append(message)
-        print("\t>>> " + message)
+            self.problems[page_project][page_title].append(message)
 
     def format_top(self, n=500):
         top = f'Потребують перекладу {len(self.to_translate)} різних сторінок.\n'
@@ -503,9 +501,10 @@ class IwBot:
         return top
 
     def format_problems(self, project):
+        problems = self.problems.get(project)
         probl = '{| class="standard sortable"\n'
         probl += "! Стаття з проблемами || Опис проблеми || N\n"
-        for problem in sorted(self.problems[project].keys()):
+        for problem in sorted(self.problems.get(project, {}).keys()):
             Nproblems = 0
             tablAppend = ""
             for prob in self.problems[project][problem]:
@@ -536,11 +535,15 @@ class IwBot:
                 probl += tablAppend
         probl += "|}"
 
-        probl = f"""Ситуація станом на {datetime.now().strftime(TIME_FORMAT)}.
+        see_also = '\n'.join(
+            f'* [[{pr["page"]}/{ERROR_REPORT_TITLE}]]'
+            for k, pr in PROJECTS.items()
+            if k != project
+        )
+        probl = f"""{probl}
 
-== Сторінки до виправлення ==
-
-{probl}
+== Див. також ==
+{see_also}
 
 [[Категорія:Упорядкування Вікіпедії]]"""
         return probl
@@ -634,24 +637,20 @@ def iw_templates(code):
 
 
 def deduplicate_comments(text):
-    return re.sub(
+    text = re.sub(
         rf"<!-- Проблема вікіфікації: (.+?)-->(<!-- Проблема вікіфікації: \1-->)+",
         rf"<!-- Проблема вікіфікації: \1-->",
         text,
     )
+    return text
 
 
 def list_problem_pages():
     for pn, project in PROJECTS.items():
-        pp = pywikibot.Page(SITE, project['errors_page'])
+        pp = pywikibot.Page(SITE, project['page'] + '/' + ERROR_REPORT_TITLE)
         titles = re.findall(r'^\| (?:rowspan="\d+" \| )?\[\[([^\]]+)]]', pp.text, re.M)
         for title in titles:
             yield pywikibot.Page(SITE, title)
-
-    pp = pywikibot.Page(SITE, ERROR_REPORT_TITLE)
-    titles = re.findall(r'^\| (?:rowspan="\d+" \| )?\[\[([^\]]+)]]', pp.text, re.M)
-    for title in titles:
-        yield pywikibot.Page(SITE, title)
 
     for page in SITE.search("insource:/\<!-- Проблема вікіфікації/"):
         if page.title() not in titles:
@@ -659,47 +658,83 @@ def list_problem_pages():
 
 
 PROJECTS = dict(
-    comp=dict(
-        cat="Категорія:Статті проєкту Комп'ютерні науки",
-        errors_page='Вікіпедія:Проєкт:Комп\'ютерні науки/Сторінки з неправильно використаним шаблоном "Не перекладено"',
-        page="Вікіпедія:Проєкт:Комп'ютерні науки",
-
-    ),
     anime=dict(
-        cat="Категорія:Статті проєкту Аніме та манґа",
-        errors_page='Вікіпедія:Проєкт:Аніме та манґа/Сторінки з неправильно використаним шаблоном "Не перекладено"',
         page='Вікіпедія:Проєкт:Аніме та манґа',
+        pattern="Вікіпроєкт:Аніме та манґа",
+    ),
+    astro=dict(
+        page='Вікіпедія:Проєкт:Астрономія',
+        pattern='Проєкт:Астрономія',
     ),
     bio=dict(
-        cat="Категорія:Статті проєкту Біологія",
-        errors_page='Вікіпедія:Проєкт:Біологія/Сторінки з неправильно використаним шаблоном "Не перекладено"',
         page='Вікіпедія:Проєкт:Біологія',
+        aliases=['Проєкт:Історія біології'],
+        pattern="Cтаття проєкту ((Молекулярна )?біологія|Екологія|Ентомологія|Історія біології|Г?риби|Птахи)",
     ),
-    math=dict(
-        cat="Категорія:Статті проєкту Математика",
-        page='Вікіпедія:Проєкт:Математика',
-        errors_page='Вікіпедія:Проєкт:Математика/Сторінки з неправильно використаним шаблоном "Не перекладено"',
+    cinema=dict(
+        page="Вікіпедія:Проєкт:Кінематограф",
+        pattern="Вікіпроєкт:Кінематограф",
     ),
-    med=dict(
-        cat="Категорія:Статті проєкту Медицина",
-        errors_page='Вікіпедія:Проєкт:Медицина/Сторінки з неправильно використаним шаблоном "Не перекладено"',
-        page='Вікіпедія:Проєкт:Медицина',
+    comp=dict(
+        page="Вікіпедія:Проєкт:Комп'ютерні науки",
+        pattern="Стаття проєкту Комп'ютерні науки"
+    ),
+    fanta=dict(
+        page='Вікіпедія:Проєкт:Фантастика',
+        pattern="Вікіпроєкт:(Фентезі|(Наукова )?Фантастика( жахів)?)",
     ),
     femin=dict(
-        cat="Категорія:Статті проєкту Фемінізм",
-        errors_page='Вікіпедія:Проєкт:Фемінізм/Сторінки з неправильно використаним шаблоном "Не перекладено"',
         page='Вікіпедія:Проєкт:Фемінізм',
+        pattern='Стаття проєкту:Фемінізм',
     ),
+    ball=dict(
+        page='Вікіпедія:Проєкт:Футбол',
+        pattern='Вікіпроєкт:Футбол',
+    ),
+    games=dict(
+        page="Вікіпедія:Проєкт:Відеоігри",
+        pattern='Проєкт:Відеоігри',
+    ),
+    math=dict(
+        page='Вікіпедія:Проєкт:Математика',
+        pattern="Вікіпроєкт Математика",
+    ),
+    mil=dict(
+        page='Вікіпедія:Проєкт:Військова історія',
+        pattern='Стаття проєкту Військова (історія|техніка)',
+    ),
+    music=dict(
+        page='Вікіпедія:Проєкт:Музика',
+        pattern='Проєкт:Музика',
+    ),
+    med=dict(
+        page='Вікіпедія:Проєкт:Медицина',
+        pattern="Вікіпроєкт:Медицина",
+    ),
+    phys=dict(
+        page='Вікіпедія:Проєкт:Фізика',
+        pattern='Стаття проєкту Фізика',
+    )
+)
+PROJECTS[None] = dict(
+    page = f'Користувач:{BOT_NAME}'
 )
 
-def detect_project(p):
+from icecream import ic
+def detect_projects(p):
     tp = p.toggleTalkPage()
-    talk_cats = {c.title() for c in tp.categories()}
     for pn, project in PROJECTS.items():
-        if project['page'] in p.title():
-            return pn
-        if project['cat'] in talk_cats:
-            return pn
+        title = p.title()
+        if project['page'] in title: 
+            yield pn
+            continue
+        for alias in project.get('aliases', []):
+            if alias in title:
+                yield pn
+        if 'pattern' not in project:
+            continue
+        if ic(re.findall(ic(project['pattern']), ic(tp.text), re.IGNORECASE)):
+            yield pn
 
 if __name__ == "__main__":
     main()

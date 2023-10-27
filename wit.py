@@ -13,7 +13,6 @@ import pywikibot
 from pywikibot import pagegenerators
 from diff_match_patch import diff_match_patch
 
-SITE = pywikibot.Site("uk", "wikipedia")
 PAGES_DIR = 'pages'
 
 COMMENT = ''
@@ -36,6 +35,13 @@ def diff():
     push_changes(True, '')
 
 @click.command()
+def fdiff():
+    for filepath in glob.iglob(PAGES_DIR + '/*.wiki'):
+        changes, original = read_pair(filepath)
+        if changes != original:
+            pywikibot.showDiff(original, changes)
+
+@click.command()
 def cleanup():
     for f in glob.glob(PAGES_DIR + '/*.wiki'):
         os.remove(f)
@@ -44,22 +50,27 @@ def cleanup():
 
 def push_changes(dry, comment):
     for filepath in glob.iglob(PAGES_DIR + '/*.wiki'):
+        changes, original = read_pair(filepath)
         page_name = filepath[len(PAGES_DIR) + 1:-len('.wiki')].replace('_SLASH_', '/')
-        with open(filepath) as f:
-            changes = f.read()
-        with open(PAGES_DIR + '_orig' + filepath[len(PAGES_DIR):]) as f:
-            original = f.read()
         if changes != original:
             apply_patch(dry, page_name, changes, original, comment)
             if not dry:
                 with open(PAGES_DIR + '_orig' + filepath[len(PAGES_DIR):], 'w') as f:
                     f.write(changes)
 
+def read_pair(filepath):
+    with open(filepath) as f:
+        changes = f.read()
+    with open(PAGES_DIR + '_orig' + filepath[len(PAGES_DIR):]) as f:
+        original = f.read()
+    return changes.strip(), original.strip()
+
 def search(query, namespaces):
     with open(PAGES_DIR + '/exclude.lst') as f:
         excludes = set(l.strip() for l in f)
 
-    for page in pagegenerators.SearchPageGenerator(query, site=SITE, namespaces=namespaces):
+    site = pywikibot.Site("uk", "wikipedia")
+    for page in pagegenerators.SearchPageGenerator(query, site=site, namespaces=namespaces):
         title = page.title()
         if title in excludes:
             continue
@@ -70,7 +81,8 @@ def apply_patch(dry, name, new_text, original, comment):
     dmp = diff_match_patch()
     patches = dmp.patch_make(original, new_text)
 
-    page = pywikibot.Page(SITE, name)
+    site = pywikibot.Site("uk", "wikipedia")
+    page = pywikibot.Page(site, name)
     if page.text == new_text:
         print("Already changed, not saving")
         return
@@ -105,6 +117,7 @@ def main():
 
 main.add_command(pull)
 main.add_command(push)
+main.add_command(fdiff)
 main.add_command(diff)
 main.add_command(cleanup)
 
