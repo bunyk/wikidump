@@ -376,7 +376,7 @@ class IwBot:
                 summary.add(REPLACE_SUMMARY)
             if problem:
                 new_text = new_text.replace(str(tmpl), problem)
-                summary.add("присутні [[Шаблон:Не_перекладено/документація#Якщо_бот_робить_зауваження|проблеми вікіфікації]]")
+                summary.add("[[Шаблон:Не_перекладено/документація#Якщо_бот_робить_зауваження|проблеми вікіфікації]]")
 
         # avoid duplication of comments
         new_text = deduplicate_comments(new_text)
@@ -731,7 +731,7 @@ def detect_projects(p):
                 yield pn
         if 'pattern' not in project:
             continue
-        if ic(re.findall(ic(project['pattern']), ic(tp.text), re.IGNORECASE)):
+        if re.findall(project['pattern'], tp.text, re.IGNORECASE):
             yield pn
 
 if __name__ == "__main__":
