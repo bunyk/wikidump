@@ -11,7 +11,7 @@ import re, json
 from datetime import datetime, timedelta
 import traceback
 import itertools
-from collections import Counter
+from collections import defaultdict
 import random
 import sys
 
@@ -31,9 +31,9 @@ def main():
     if len(sys.argv) > 1:
         delay = int(sys.argv[1])
     robot.last_problems_update = datetime.now() - PROBLEMS_UPDATE_PERIOD + timedelta(hours=delay)
-    robot.run_forever()
 
-    title = 'Вікіпедія:Чим не є Вікіпедія'
+    robot.run_forever()
+    title = 'Гауптман з Копеніка'
     # robot.process(pywikibot.Page(SITE, title))
 
 
@@ -215,9 +215,12 @@ def backlinks_backlog():
     return tmpl_p.getReferences(namespaces=NAMESPACES, only_template_inclusion=True)
 
 
-def order_backlog(pages):
+def order_backlog(last, pages):
+    last = set(last)
     titles = set(p.title() for p in pages)
-    backlog = list(titles)
+    diff = titles.difference(last)
+    print(len(diff), "new pages:", ", ".join(diff))
+    backlog = list(titles | last)
     backlog.sort()
     return backlog
 
@@ -231,11 +234,11 @@ class IwBot:
         self.backlog = []
         self.problems = {}
         self.last_problems_update = None
-        self.to_translate = Counter()
+        self.to_translate = defaultdict(set)
         self.cursor = 0
 
-        if not self.load():
-            self.backlog = order_backlog(pages())
+        self.load()
+        self.backlog = order_backlog(self.backlog, pages())
 
         self.wiki_cache = WikiCache()
         self.processed_pages = set()
@@ -244,27 +247,35 @@ class IwBot:
         with open(HIBERNATE_FILE, "w") as f:
             state = dict(
                 backlog=self.backlog,
-                to_translate=self.to_translate,
+                to_translate={
+                    p: list(links)
+                    for p, links in self.to_translate.items()
+                },
                 cursor=self.cursor,
             )
             json.dump(state, f, ensure_ascii=False, indent=" ")
 
     def load(self):
         try:
+            print("loading", HIBERNATE_FILE)
             with open(HIBERNATE_FILE) as f:
                 data = json.load(f)
                 self.backlog = data["backlog"]
-                self.to_translate = Counter(data["to_translate"])
+                print("loaded", len(self.backlog), "page titles")
+                self.to_translate = defaultdict(set)
+                for k, v in data["to_translate"].items():
+                    self.to_translate[k] = set(v)
                 self.cursor = data["cursor"]
             return True
-        except Exception:
+        except Exception as e:
+            print(e)
             return False
 
     def reset(self):
         self.wiki_cache.clear()
-        self.backlog = order_backlog(self.pages())
+        self.backlog = order_backlog(self.backlog, self.pages())
         self.cursor = 0
-        self.to_translate = Counter()
+        self.to_translate = defaultdict(set)
 
     def run(self):
         try:
@@ -297,7 +308,7 @@ class IwBot:
         self.wiki_cache.clear()
         self.problems = {}
 
-        problem_titles = order_backlog(list_problem_pages())
+        problem_titles = order_backlog([], list_problem_pages())
         for title in (pbar := tqdm(problem_titles)):
             pbar.set_postfix(page=f'{title:_<40.40s}')
             self.process_step(title)
@@ -331,8 +342,9 @@ class IwBot:
 
     def process(self, page):
         """Process page to remove unnecessary iw templates"""
+        title = page.title()
         for exc in TITLE_EXCEPTIONS:
-            if exc in page.title():
+            if exc in title:
                 print("Skipping page because of title")
                 return
             
@@ -349,12 +361,12 @@ class IwBot:
 
         for tmpl in iw_templates(code):
             if len(page.text) > MAX_SUPPORTED_TEXT_LEN:
-                print("Skipping", page.title(), "because of size", len(page.text), "characters")
+                print("Skipping", title, "because of size", len(page.text), "characters")
                 return
             replacement = False
             problem = False
             try:
-                replacement = self.find_replacement(tmpl)
+                replacement = self.find_replacement(tmpl, title)
             except IwExc as e:
                 self.add_problem(page, e.message)
                 problem = (
@@ -402,7 +414,7 @@ class IwBot:
             raise e
 
 
-    def find_replacement(self, tmpl):
+    def find_replacement(self, tmpl, title):
         """Return string to which template should be replaced, if it should
         Return None or other falsy value otherwise.
         """
@@ -418,7 +430,7 @@ class IwBot:
         if not there["exists"]:
             raise IwExc(f"Не знайдено сторінки [[:{lang}:{external_title}]]")
 
-        self.to_translate.update([f"{lang}:{external_title}"])
+        self.to_translate[f"{lang}:{external_title}"].add(title)
 
         if not (there["wikidata_id"] or there["redirect_wikidata_id"]):
             if here["exists"]:
@@ -489,11 +501,12 @@ class IwBot:
 
     def format_top(self, n=500):
         top = f'Потребують перекладу {len(self.to_translate)} різних сторінок.\n'
-        top += f'Загальна кількість червоних посилань до перекладу: {sum(self.to_translate.values())}.\n\n'
         top += f'{n} найпотрібніших перекладів:\n'
         top += '{| class="standard sortable"\n'
         top += "! Сторінка до перекладу || N\n"
-        for page, n in self.to_translate.most_common(n):
+        tt = [(page, len(links)) for page, links in self.to_translate.items()]
+        tt.sort(key=lambda x: (-x[1], x[0]))
+        for page, n in tt[:n]:
             top += "|-\n| [[:%s]] || %d\n" % (page, n)
         top += "|}"
         return top
@@ -679,6 +692,7 @@ PROJECTS = dict(
     ),
     fanta=dict(
         page='Вікіпедія:Проєкт:Фантастика',
+        aliases=['Вікіпедія:Проєкт:Фентезі'],
         pattern="Вікіпроєкт:(Фентезі|(Наукова )?Фантастика( жахів)?)",
     ),
     femin=dict(

@@ -20,7 +20,7 @@ COMMENT = ''
 @click.command()
 @click.argument('search_query')
 @click.option('-l', '--limit', type=int, default=100, help='limit on number of pages to download')
-@click.option('-n', '--namespaces', default=[0], type=int, multiple=True, help='namespaces to download')
+@click.option('-n', '--namespaces', default=[], type=int, multiple=True, help='namespaces to download')
 def pull(search_query, limit, namespaces):
     for page in islice(search(search_query, namespaces), limit):
         save(page)

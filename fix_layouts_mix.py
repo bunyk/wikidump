@@ -149,12 +149,7 @@ def iter_mixed(dump_filename):
         if i % 123 == 0:
             print('\033[K\r', i, page.title, file=sys.stderr, end='')
 
-        mixed = find_mixes(page.text)
-        if mixed:
-            new_text = fix_page_text(page.text)
-            if new_text != page.text :
-                # print(len(mixed), page.title + ':', ', '.join(colored(mix) for mix in mixed[:5]))
-                yield page.title
+        yield from find_mixes(page.text)
 
 def find_mixes(text):
     return re.findall(mixed_re, text, re.I)

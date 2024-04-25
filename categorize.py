@@ -14,7 +14,17 @@ def main():
 
 site = pywikibot.Site('uk', 'wikipedia')
 
+def search_category_articles(category, out, prefix = '', depth=2):
+    t = category.title(with_ns=False)
+    for a in category.articles():
+        out[a.title()] = prefix + t
+    if depth == 0:
+        return
+    for c in category.subcategories():
+        search_category_articles(c, out, prefix + t + ' -> ', depth-1)
+
 def translate_category(pagename, uk_title):
+    print('Translate category', pagename, uk_title)
     if isprefixed(uk_title,
         'Категорія:Модуль',
         'Категорія:Вікіпедія:',
@@ -34,13 +44,13 @@ def translate_category(pagename, uk_title):
         uk_cat.save('Створення нової категорії')
         add_sitelink(cat, uk_title)
 
-    already_categorized = set()
-    for a in uk_cat.articles():
-        already_categorized.add(a.title())
+
+    already_categorized = dict()
+    search_category_articles(uk_cat, already_categorized, depth=3)
 
     for uk_title in get_uk_articles(cat):
         if uk_title in already_categorized:
-            print(f"{uk_title} вже в категорії {uk_cat}")
+            print(f"{uk_title} вже в категорії {already_categorized[uk_title]}")
             continue
         add_page_to_category(uk_title, uk_cat)
 
@@ -89,10 +99,11 @@ def get_translation(page, lang):
         item = pywikibot.ItemPage.fromPage(page)
     except pywikibot.exceptions.NoPageError as e:
         print('Not found', page)
+        raise
         return
     sl = item.sitelinks.get(lang+'wiki')
     if sl:
-        return sl.title
+        return sl.ns_title()
 
 def get_uk_version(page):
     return get_translation(page, 'uk')
@@ -104,7 +115,14 @@ def add_cats(lang, pagename):
         print(f"{pagename} не має відповідника в {lang} вікіпедії")
         return
     enpage = pywikibot.Page(site, lang + ':'+entitle)
-    for cat in reversed(list(enpage.categories())):
+    if page.is_categorypage():
+        if not enpage.is_categorypage():
+            print(f"{pagename} - категорія, а {entitle} - ні")
+            return
+        cats = [pywikibot.Category(site, lang + ':' + enpage.title(with_ns=False))]
+    else:
+        cats = reversed(list(enpage.categories()))
+    for cat in cats:
         if isprefixed(cat.title(),
                 'Category:All articles',
                 'Category:Wikipedia articles ',
@@ -120,6 +138,8 @@ def add_cats(lang, pagename):
                 uk_cat = ''
         if uk_cat.startswith('Категорія:'):
             uk_cat = uk_cat[len('Категорія:'):]
+        if uk_cat.startswith('Category:'):
+            uk_cat = uk_cat[len('Category:'):]
         if uk_cat:
             translate_category(lang + ':' + cat.title(), 'Категорія:' + uk_cat)
 
