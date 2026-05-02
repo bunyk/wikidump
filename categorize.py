@@ -80,9 +80,9 @@ def get_uk_text(cat):
     for cc in cat.categories():
         uk_version = get_uk_version(cc)
         if uk_version and not uk_version.startswith('Вікіпедія:'):
-            if uk_version.startswith('Category:'):
-                uk_version = uk_version[len('Category:'):]
-            uk_text.append(f'[[Категорія:{uk_version}]]')
+            uk_version.replace("Category:", "Категорія:")
+            uk_text.append(f'[[{uk_version}]]')
+
 
     return '\n'.join(uk_text)
 
