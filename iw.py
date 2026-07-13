@@ -106,7 +106,9 @@ class WikiCache:
     """Cache requests to wiki to avoid repeated requests"""
 
     def __init__(self, filename="cache.json"):
-        self.sites = dict(d=pywikibot.Site("wikidata", "wikidata"))
+        wdSite=pywikibot.Site("wikidata", "wikidata")
+        wdSite.login()
+        self.sites = dict(d=wdSite)
         self.cache = dict()
 
     def get_site(self, lang):
